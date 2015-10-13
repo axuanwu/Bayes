@@ -4,7 +4,7 @@ import os
 import numpy as np
 import time
 import datetime
-
+from pro_estimate import Pro_estimate
 
 class READ_Bought_History():
     def __init__(self):
@@ -25,12 +25,17 @@ class READ_Bought_History():
         self.class_num = -1  # 记录最大编号 +1为分类数
         # 热度排行初过滤参数  只对最畅销的 n 个商品进行精细计算
         self.top_k = 20000
+        self.simple = True
         # 分类别关联性 商品热度统计
         self.num_k = 5  # 邻近的num_k个自身算第一个 被认为有关联
         self.like_matrix = np.zeros((10, 10), int)  # 存储不同分类下的
         # self.matrix = np.zeros((self.top_k+1,self.class_num+1), int)
         # 需要测试的数据组
         self.test_list = []
+        # 关联商品的热度分布
+        self.temp_item_array_hot=np.array([0]*10)
+        # 结果输出相关参数
+        self.r_top_num = 200  # 取前200个商品
 
     def read_history(self):
         # 将购买物品
@@ -154,10 +159,99 @@ class READ_Bought_History():
             temp_str += ',' + str(temp_item[1])
         self.test_list.append(temp_str)
 
+    # 利用全局热度 扩展到 某一个分类的热度分布
+    def all_2_class(self,class_index):
+        # 尾数重分布 : 前top_k个商品使用统计分布， 残余的冷门商品利用总次数按照全局统计的结果进行分布
+        # self.temp_item_array_hot = np.array([0.0]*(self.item_num + 1))
+        zhi_shu = 1.0 * self.like_matrix[self.top_k,class_index] / sum(self.item_array[self.top_k:,1])  # 某类别的残余项统计与全局残余项对比
+        self.temp_item_array_hot = zhi_shu * self.item_array[:,1]
+        self.temp_item_array_hot[0:self.top_k] = self.like_matrix[0:self.top_k,class_index]
+        num_total = sum(self.like_matrix[:,class_index])
+        # 残余项 概率计算比例
+        bi_li = 1.0*zhi_shu/num_total*(self.record_num+1)
+        # 概率优化
+        pes = Pro_estimate()
+        # 前top_k个
+        p_pre0 = 0
+        num_total = sum(self.like_matrix[:,class_index])
+        for i_item in xrange(0,self.item_num + 1):
+            if self.simple and i_item>self.top_k:
+                self.temp_item_array_hot[i_item] = bi_li * self.item_array[i_item,1] / (self.record_num+1)
+            p_pre = 1.0 * self.item_array[i_item,1]/(self.record_num+1)
+            if p_pre != p_pre0:
+                p_pre0 = p_pre
+                pes.solve_function(p_pre)
+                pes.set_array()
+            self.temp_item_array_hot[i_item] = pes.get_pro(self.temp_item_array_hot[i_item],num_total)
+
+    # 后邻的n个商品意见组合方式 目前 简单求和
+    def union_pro(self,temp_result):
+        k = 1.0
+        for x in xrange(0,len(temp_result)):
+            k *= (1-temp_result[x])
+        return 1-k
+
+    #   统计该商品的关联商品分布 并返回序列
+    def count_items(self,item_id,user_str):
+        """
+
+        :type item_id: 商品id 整数
+        :type user_str: item_id 的购买者列表 字符串，不同用户逗号间隔
+        """
+        k_step = self.num_k  # 认为紧接前K个商品之间有匹配关系
+        result_matrix = np.zeros((self.item_num+1,self.num_k))
+        user_list = user_str.split(',')
+        for user in user_list:
+            user_index = self.user_dict[int(user)]
+            i_record = self.user_array[user_index, 0] # 用户开始的记录
+            start = False  #  统计开始的标志
+            k = 0
+            while i_record < self.user_array[user_index, 1]:
+                if self.user_item_array[i_record,0] == item_id:
+                    start = True
+                    k = 0  # 统计的个数  1开始计数
+                elif start & k <= k_step:
+                    temp_item = self.user_item_array[i_record, 0]
+                    item_index = self.item_dict[temp_item]
+                    result_matrix[item_index,k] += 1 # 对应位置+1
+                    k += 1
+        #  计算统计 该商品的关联性质
+        col_sum = result_matrix.sum(0)  # 按照列 求和
+        row_sum = result_matrix.sum(1)  # 按照行 求和
+        temp_result_array = np.zeros((20000, 2))  # 存储 计算结果
+        temp_result = np.array([0.0]*len(col_sum))
+        my_orders = np.argsort(-self.temp_item_array_hot)  # 概率 降序 取序号
+        i_temp_result = 0
+        pes = Pro_estimate()
+        for i_order in xrange(0,self.item_num+1):
+            temp_item_index = my_orders[i_order]  # 商品的下标
+            # 优化原假设 self.temp_item_array_hot
+            if (i_order < self.r_top_num)|(row_sum[temp_item_index]>0):
+                pes.solve_function(self.temp_item_array_hot[temp_item_index])
+                pes.set_array()
+                for i in xrange(0,len(col_sum)):
+                    temp_result[i] = pes.get_pro(result_matrix[temp_item_index,i],col_sum[i])
+                temp_pro = self.union_pro(temp_result)
+                temp_result_array[i_temp_result] = [self.item_array[temp_item_index,0], temp_pro] # 记录商品 其概率结果
+                i_temp_result += 1
+                if i_temp_result == 20000:  # 超出记录空间 断出
+                    break
+        temp_result_array = temp_result_array[0:i_temp_result, :]
+        temp_order = np.argsort(-temp_result_array[:, 1]) # 按照概率降序排列
+        result_str = str(item_id)+' '+str(temp_result_array[temp_order[0], 0])
+        for i in xrange(1,self.r_top_num):
+            result_str += ',' + str(temp_result_array[temp_order[i], 0])
+        return result_str
+    
     # 计算某一个商品的的搭配商品结果
     def calculate_item_list(self, item_user_str):
-        pass
-
+        aaa = item_user_str.split('\t')
+        item_id = int(aaa[0])  # 商品编号
+        item_index = self.item_dict.get(item_id, 0) # 商品存储位置编号
+        class_id = self.item_class[item_index]
+        class_index = self.class_dict[class_id]
+        self.all_2_class(item_id)  # 取得该商品类别的 经验分布
+        result_str = self.count_items(item_id,aaa[1])
 
 
 if __name__ == "__main__":
@@ -167,3 +261,4 @@ if __name__ == "__main__":
     a.item_hot()
     a.read_class_id()
     a.class_item_hot()
+    a.my_test()

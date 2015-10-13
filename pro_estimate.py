@@ -65,7 +65,7 @@ class Pro_estimate():
             temp_step_x = step_end - start
             # 概率密度为：math.exp(self.alpha * temp_x - 1 + self.beta) 取其对数
             temp_pro = self.alpha * temp_x - 1 + self.beta
-            if math.exp(temp_pro)*temp_step_x < 0.00001 and step<0.0005:
+            if math.exp(temp_pro)*temp_step_x < 0.0005 and step<0.005:
                 step *= 2
                 continue
             else:
@@ -95,4 +95,4 @@ if __name__ == "__main__":
     # print sum(a.array_pro_pro)
     a.set_array()
     print a.get_pro(0,0)
-    print a.get_pro(10,100)
+    print a.get_pro(100,1000)
