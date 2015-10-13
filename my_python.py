@@ -29,6 +29,8 @@ class READ_Bought_History():
         self.num_k = 5  # 邻近的num_k个自身算第一个 被认为有关联
         self.like_matrix = np.zeros((10, 10), int)  # 存储不同分类下的
         # self.matrix = np.zeros((self.top_k+1,self.class_num+1), int)
+        # 需要测试的数据组
+        self.test_list = []
 
     def read_history(self):
         # 将购买物品
@@ -110,7 +112,7 @@ class READ_Bought_History():
 
     def class_item_hot(self):
         # 各类商品 关联商品热度 统计结果为购买某一类商品后 其他各个商品出现其后的概率
-        self.matrix = np.zeros((self.top_k + 1, self.class_num + 1), int)  # 最后一行记录残余项
+        self.like_matrix = np.zeros((self.top_k + 1, self.class_num + 1), int)  # 最后一行记录残余项
         # 关联数
         temp_array = np.array([-1] * self.num_k)  #
         index_temp = 0
@@ -131,8 +133,31 @@ class READ_Bought_History():
                 class_index0 = temp_array[class_id0]
                 if class_index0 == -1:
                     break
-                self.matrix[item_index,class_index0] += 1
+                self.like_matrix[item_index, class_index0] += 1
             index_temp = self.add_circle(index_temp, 1)  # 下一个位置
+
+    # 读取需要计算的商品
+    def my_test(self):
+        read_stream = open(os.path.join(self.data_dir, "test_items.txt"), 'r')
+        item_id = 0
+        temp_str = ''
+        first = True
+        for line_i in read_stream:
+            a = line_i.strip().split('\t')
+            temp_item = [int(a[0]), int(a[1])]
+            if item_id != temp_item[0]:
+                if first == True:
+                    first = False
+                else:
+                    self.test_list.append(temp_str)
+                temp_str = str(temp_item[0]) + '\t' + str(temp_item[1])
+            temp_str += ',' + str(temp_item[1])
+        self.test_list.append(temp_str)
+
+    # 计算某一个商品的的搭配商品结果
+    def calculate_item_list(self, item_user_str):
+        pass
+
 
 
 if __name__ == "__main__":
