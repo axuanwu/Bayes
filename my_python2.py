@@ -7,6 +7,7 @@ import datetime
 from myclass import MCard
 
 class READ_Bought_History():
+
     def __init__(self):
         self.data_dir = 'E:\\gitshell\\tianchi'
         self.user_dict = {}
