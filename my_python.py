@@ -202,14 +202,14 @@ class READ_Bought_History():
         :type user_str: item_id 的购买者列表 字符串，不同用户逗号间隔
         """
         # 空的 user 列表
-        if user_str == '-1':
+        if user_str[0:2] == '-1':
             my_orders = np.argsort(-self.temp_item_array_hot)
             result_str = item_id + ' ' + str(self.item_array[my_orders[0], 0])
             for i_order in xrange(1, self.r_top_num):
                 result_str += ',' + str(self.item_array[my_orders[i_order], 0])
             return result_str
         k_step = self.num_k  # 认为紧接前K个商品之间有匹配关系
-        result_matrix = np.zeros((self.item_num+1,self.num_k))
+        result_matrix = np.zeros((self.item_num + 1, k_step))
         user_list = user_str.split(',')
         for user in user_list:
             user_index = self.user_dict[int(user)]
@@ -220,7 +220,7 @@ class READ_Bought_History():
                 if self.user_item_array[i_record,0] == item_id:
                     start = True
                     k = 0  # 统计的个数  1开始计数
-                elif start & k <= k_step:
+                elif start & (k < k_step):
                     temp_item = self.user_item_array[i_record, 0]
                     item_index = self.item_dict[temp_item]
                     result_matrix[item_index,k] += 1 # 对应位置+1
@@ -260,7 +260,7 @@ class READ_Bought_History():
         item_index = self.item_dict.get(item_id, 0) # 商品存储位置编号
         class_id = self.item_class[item_index]
         class_index = self.class_dict[class_id]
-        self.all_2_class(item_id)  # 取得该商品类别的 经验分布
+        self.all_2_class(class_index)  # 取得该商品类别的 经验分布
         return self.count_items(item_id, aaa[1])
 
     # 计算所有的商品列表
@@ -268,6 +268,7 @@ class READ_Bought_History():
         w_stream = open(os.path.join(self.data_dir, 'my_result.txt'), 'w')
         for item_user_str in self.test_list:
             string0 = self.calculate_item_list(item_user_str)
+            print time.time(), item_user_str
             w_stream.writelines(string0 + '\n')
         w_stream.close()
 if __name__ == "__main__":
@@ -278,3 +279,4 @@ if __name__ == "__main__":
     a.read_class_id()
     a.class_item_hot()
     a.my_test()
+    a.calculate_all()
