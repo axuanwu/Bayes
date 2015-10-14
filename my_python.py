@@ -149,6 +149,9 @@ class READ_Bought_History():
         first = True
         for line_i in read_stream:
             a = line_i.strip().split('\t')
+            # 增加 未有购买记录的商品处理方式
+            if a[1] == 'None':
+                a[1] = -1
             temp_item = [int(a[0]), int(a[1])]
             if item_id != temp_item[0]:
                 if first == True:
@@ -198,6 +201,13 @@ class READ_Bought_History():
         :type item_id: 商品id 整数
         :type user_str: item_id 的购买者列表 字符串，不同用户逗号间隔
         """
+        # 空的 user 列表
+        if user_str == '-1':
+            my_orders = np.argsort(-self.temp_item_array_hot)
+            result_str = item_id + ' ' + str(self.item_array[my_orders[0], 0])
+            for i_order in xrange(1, self.r_top_num):
+                result_str += ',' + str(self.item_array[my_orders[i_order], 0])
+            return result_str
         k_step = self.num_k  # 认为紧接前K个商品之间有匹配关系
         result_matrix = np.zeros((self.item_num+1,self.num_k))
         user_list = user_str.split(',')
