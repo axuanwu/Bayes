@@ -251,9 +251,15 @@ class READ_Bought_History():
         class_id = self.item_class[item_index]
         class_index = self.class_dict[class_id]
         self.all_2_class(item_id)  # 取得该商品类别的 经验分布
-        result_str = self.count_items(item_id,aaa[1])
+        return self.count_items(item_id, aaa[1])
 
-
+    # 计算所有的商品列表
+    def calculate_all(self):
+        w_stream = open(os.path.join(self.data_dir, 'my_result.txt'), 'w')
+        for item_user_str in self.test_list:
+            string0 = self.calculate_item_list(item_user_str)
+            w_stream.writelines(string0 + '\n')
+        w_stream.close()
 if __name__ == "__main__":
     a = READ_Bought_History()
     a.read_history()
