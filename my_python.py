@@ -154,6 +154,7 @@ class READ_Bought_History():
                 a[1] = -1
             temp_item = [int(a[0]), int(a[1])]
             if item_id != temp_item[0]:
+                item_id = temp_item[0]
                 if first == True:
                     first = False
                 else:
@@ -225,6 +226,7 @@ class READ_Bought_History():
                     item_index = self.item_dict[temp_item]
                     result_matrix[item_index,k] += 1 # 对应位置+1
                     k += 1
+                i_record += 1
         #  计算统计 该商品的关联性质
         col_sum = result_matrix.sum(0)  # 按照列 求和
         row_sum = result_matrix.sum(1)  # 按照行 求和
