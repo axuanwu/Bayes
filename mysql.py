@@ -101,6 +101,22 @@ def my_tongJi(curser):
 
 # my_tongJi(curser)
 
+def tongji3(curser):
+    sql = """select c.[class_id],isnull(sum(c.num),0)num1,COUNT(*) num2 from (SELECT a.[item_id]
+            ,a.[class_id]
+            ,b.num,b.[ranknum]
+            FROM [axuanwu].[dbo].[dim_items2] a left join [baoxian].[dbo].[item_hot] b
+            on a.item_id =b.itemid) c group by c.[class_id] order by num2 desc """
+    w_stream = open("E:\\gitshell\\tianchi\\class_hot.txt", 'w')
+    print sql
+    curser.execute(sql)
+    for i in curser:
+        w_stream.writelines(str(i[0]) + '\t' + str(i[1]) + '\t' + str(i[2]) + '\n')
+    w_stream.close()
+
+
+tongji3(curser)
+
 # 统计数据库中相关搭配 与 购买顺序的的关系
 def my_tongji2():
     table_name6 = "[baoxian].[dbo].[user_bought_history_ex4]"  # 记录数
@@ -113,8 +129,7 @@ def my_tongji2():
           + " where order_diff !=0 group by day_diff order by day_diff "
     print sql
 
-
-my_tongji2()
+# my_tongji2()
 curser.close()
 
 con.close()
