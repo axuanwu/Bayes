@@ -196,7 +196,8 @@ class READ_Bought_History():
                 aaa = line.rstrip().split('\t')
                 item_str_array = aaa[1].split(',')
                 for i in xrange(0, n):
-                    self.like_matrix[line, i] = math.exp(float(item_str_array[i]))
+                    self.like_matrix[i_line, i] = math.exp(float(item_str_array[i]))
+                i_line += 1
             r_stream.close()
     # 读取需要计算的商品
     def my_test(self):
@@ -217,12 +218,13 @@ class READ_Bought_History():
                 else:
                     self.test_list.append(temp_str)
                 temp_str = str(temp_item[0]) + '\t' + str(temp_item[1])
-            temp_str += ',' + str(temp_item[1])
+            else:
+                temp_str += ',' + str(temp_item[1])
         self.test_list.append(temp_str)
 
     # 利用全局热度 扩展到 某一个分类的热度分布
     def all_2_class(self, class_index):
-        zhi_shu = self.like_matrix[self.top_k, class_index] * (self.record_num + 1) / sum(
+        zhi_shu = 1.0 * self.like_matrix[self.top_k, class_index] * (self.record_num + 1) / sum(
             self.item_array[self.top_k:, 1])
         self.temp_item_array_hot = zhi_shu * self.item_array[:, 1] / (self.record_num + 1)
         self.temp_item_array_hot[0:self.top_k] = self.like_matrix[0:self.top_k, class_index]
@@ -266,7 +268,7 @@ class READ_Bought_History():
         # 空的 user 列表
         if user_str[0:2] == '-1':
             my_orders = np.argsort(-self.temp_item_array_hot)
-            result_str = item_id + ' ' + str(self.item_array[my_orders[0], 0])
+            result_str = str(item_id) + ' ' + str(self.item_array[my_orders[0], 0])
             for i_order in xrange(1, self.r_top_num):
                 result_str += ',' + str(self.item_array[my_orders[i_order], 0])
             return result_str
@@ -300,7 +302,10 @@ class READ_Bought_History():
             temp_item_index = my_orders[i_order]  # 商品的下标
             # 优化原假设 self.temp_item_array_hot
             if (i_order < self.r_top_num) | (row_sum[temp_item_index] > 0):
-                pes.solve_function(self.temp_item_array_hot[temp_item_index])
+                try:
+                    pes.solve_function(self.temp_item_array_hot[temp_item_index])
+                except:
+                    print self.temp_item_array_hot[temp_item_index]
                 pes.set_array()
                 for i in xrange(0, len(col_sum)):
                     temp_result[i] = pes.get_pro(result_matrix[temp_item_index, i], col_sum[i])
@@ -313,7 +318,7 @@ class READ_Bought_History():
         temp_order = np.argsort(-temp_result_array[:, 1])  # 按照概率降序排列
         result_str = str(item_id) + ' ' + str(temp_result_array[temp_order[0], 0])
         for i in xrange(1, self.r_top_num):
-            result_str += ',' + str(temp_result_array[temp_order[i], 0])
+            result_str += ',' + str(int(temp_result_array[temp_order[i], 0]))
         return result_str
 
     # 计算某一个商品的的搭配商品结果
@@ -329,10 +334,13 @@ class READ_Bought_History():
     # 计算所有的商品列表
     def calculate_all(self):
         w_stream = open(os.path.join(self.data_dir, 'my_result.txt'), 'w')
+        iii = 0
         for item_user_str in self.test_list:
             string0 = self.calculate_item_list(item_user_str)
-            print time.time(), item_user_str
+            if iii % 100 == 0:
+                print time.time(), item_user_str
             w_stream.writelines(string0 + '\n')
+            iii += 1
         w_stream.close()
 
 
@@ -346,9 +354,9 @@ if __name__ == "__main__":
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    a.class_item_hot()
-    print time.time(), 4
-    a.read_write_class_item_hot()
+    # a.class_item_hot()
+    # print time.time(), 4
+    a.read_write_class_item_hot('r')
     a.my_test()
     print time.time(), 5
     a.calculate_all()

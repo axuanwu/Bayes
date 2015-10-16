@@ -73,30 +73,37 @@ def my_tongJi(curser):
     sql = "select a.*,b.id1,b.id2 into " + table_name3 + " from " + table_name2 \
           + " a left join " + table_name1 + " b on a.itemid=b.item "
     try:
-        curser.execute("drop table " + table_name3)
+        curser.execute(sql)
     except:
-        pass
-    print sql
-    curser.execute(sql)
+        print sql
+
     table_name4 = "[baoxian].[dbo].[user_bought_history_ex2]"  # 记录数
     sql = "select a.*,row_number()over(partition by userid order by [buy_date]) order_num into " \
           + table_name4 + " from " + table_name3 + " a"
-    print sql
-    curser.execute(sql)  # [userid] ,[itemid],[buy_date],id1,id2,order_num
+    try:
+        curser.execute(sql)
+    except:
+        print sql  # [userid] ,[itemid],[buy_date],id1,id2,order_num
     table_name5 = "[baoxian].[dbo].[user_bought_history_ex3]"  # 记录数
     sql = "select * into " + table_name5 + "from " + table_name4 + " where id1 is not null "
-    print sql
-    curser.execute(sql)
-    curser.execute("commit")
+    try:
+        curser.execute(sql)
+        curser.execute("commit")
+    except:
+        print sql
+
     # 关联
     table_name6 = "[baoxian].[dbo].[user_bought_history_ex4]"  # 记录数
     sql = "select a.*,b.itemid itemid2,b.buy_date buy_date2,b.id1 id11," \
           + "b.id2 id22,b.order_num order_num2,datediff(DAY,a.buy_date,b.buy_date) day_diff," \
           + "b.order_num-a.order_num order_diff into " + table_name6 \
-          + " from " + table_name5 + " a left join " + table_name4 + " b on a.userid = b.userid and ABS(b.order_num-a.order_num)<=30 and ABS(datediff(DAY,a.buy_date,b.buy_date))<=30"
-    print sql
-    curser.execute(sql)
-    curser.execute("commit")
+          + " from " + table_name5 + " a left join " + table_name4 + " b on a.userid = b.userid and ABS(b.order_num-a.order_num)<=100 and ABS(datediff(DAY,a.buy_date,b.buy_date))<=30"
+    try:
+        curser.execute(sql)
+        curser.execute("commit")
+    except:
+        print sql
+
 
 
 # my_tongJi(curser)
@@ -115,7 +122,7 @@ def tongji3(curser):
     w_stream.close()
 
 
-tongji3(curser)
+# tongji3(curser)
 
 # 统计数据库中相关搭配 与 购买顺序的的关系
 def my_tongji2():
@@ -129,7 +136,8 @@ def my_tongji2():
           + " where order_diff !=0 group by day_diff order by day_diff "
     print sql
 
-# my_tongji2()
+
+my_tongji2()
 curser.close()
 
 con.close()
