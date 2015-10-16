@@ -83,12 +83,15 @@ class Pro_estimate():
 
     # 修改设置数组的方式
     def set_array(self):
-        min_step = 0.0005
-        min_size = 0.005
+        min_step = 0.0005  # 区间概率
+        min_size = 0.005  # 区间宽度
         start = 0.0
         self.step_i = 0
         while start < 1:
-            step = min(min_step / math.exp(self.alpha * start - 1 + self.beta), min_size)
+            if math.exp(self.alpha * start - 1 + self.beta) < 10 ** -12:
+                step = min_size
+            else:
+                step = min(min_step / math.exp(self.alpha * start - 1 + self.beta), min_size)
             step = max(10 ** -9, step)
             step_end = min(start + step, 1)
             temp_x = 0.5 * (start + step_end)
