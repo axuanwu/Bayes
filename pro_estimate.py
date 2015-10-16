@@ -17,14 +17,17 @@ class Pro_estimate():
         self.pro_x_array = np.array([0.0] * 10000)
         self.step_x_array = np.array([0.0] * 10000)
         self.p_estimate = 0  # 最后估计的概率值
-
+        self.step_i = 0
     def solve_function(self, p):
         self.p_pre = p
-        if p<0.05:
+        if p < 0.02:
             self.alpha = -1/p
             self.beta = 1 - math.log(1.0 / self.alpha * (math.exp(self.alpha) - 1))
+            # self.beta = 1 + math.log(self.alpha) - self.alpha
         else:
             alpha = -1000 + 10 ** -9
+            if p > 0.5:
+                alpha = 10 + 10 ** -9
             sign = 1.0
             step = 1.0
             error_now = error_f(alpha, self.p_pre)
@@ -51,7 +54,7 @@ class Pro_estimate():
             self.alpha = alpha
             self.beta = 1 - math.log(1.0 / self.alpha * (math.exp(self.alpha) - 1))
 
-    def set_array(self):
+    def set_array2(self):
         start = 0.0
         step = 10.0 ** -9
         x_array = np.array([0.0] * 100000)  # 记录某个区间的中间点
@@ -78,7 +81,27 @@ class Pro_estimate():
         self.pro_x_array = pro_x_array[0:step_i]  # 每种情况的对数概率值
         self.step_x_array = step_x_array[0:step_i]  # 每种情况的取值区间大小
 
-    def get_pro(self, n, m):
+    # 修改设置数组的方式
+    def set_array(self):
+        min_step = 0.0005
+        min_size = 0.005
+        start = 0.0
+        self.step_i = 0
+        while start < 1:
+            step = min(min_step / math.exp(self.alpha * start - 1 + self.beta), min_size)
+            step = max(10 ** -9, step)
+            step_end = min(start + step, 1)
+            temp_x = 0.5 * (start + step_end)
+            # temp_step_x = step_end - start
+            # 概率密度为：math.exp(self.alpha * temp_x - 1 + self.beta) 取其对数
+            temp_pro = self.alpha * temp_x - 1 + self.beta
+            self.x_array[self.step_i] = temp_x
+            self.step_x_array[self.step_i] = step_end - start
+            self.pro_x_array[self.step_i] = temp_pro
+            start = step_end
+            self.step_i += 1
+
+    def get_pro2(self, n, m):
         # 计算不同的段x概率在m次试验中,发生n次的概率  使用对数避免精度损失
         # self.pro_x_array * self.step_x_array 每种情况发生的原始分布
         now_jiashe = np.log(self.x_array) * n + np.log(1 - self.x_array) * (m - n) + self.pro_x_array + np.log(self.step_x_array)  # 调整原始的经验分布
@@ -87,6 +110,17 @@ class Pro_estimate():
         now_jiashe = np.exp(now_jiashe)/sum(np.exp(now_jiashe))  # 返回为不同情况的 真实的概率分布
         return sum(now_jiashe * self.x_array)
 
+    def get_pro(self, n, m):
+        # 计算不同的段x概率在m次试验中,发生n次的概率  使用对数避免精度损失
+        # self.pro_x_array * self.step_x_array 每种情况发生的原始分布
+        now_jiashe = np.log(self.x_array[0:self.step_i]) * n \
+                     + np.log(1 - self.x_array[0:self.step_i]) * (m - n) \
+                     + self.pro_x_array[0:self.step_i] \
+                     + np.log(self.step_x_array[0:self.step_i])  # 调整原始的经验分布
+        my_max = now_jiashe.max()  # 以最大值为1 进行计算
+        now_jiashe = now_jiashe - my_max
+        now_jiashe = np.exp(now_jiashe) / sum(np.exp(now_jiashe))  # 返回为不同情况的 真实的概率分布
+        return sum(now_jiashe * self.x_array[0:self.step_i])
 
 if __name__ == "__main__":
     a = Pro_estimate()
@@ -96,3 +130,16 @@ if __name__ == "__main__":
     a.set_array()
     print a.get_pro(0,0)
     print a.get_pro(100,1000)
+    # a.set_array2()
+    # print a.get_pro2(0,0)
+    # print a.get_pro2(100,1000)
+    a.solve_function(0.1)
+    a.set_array()
+    print 1, a.get_pro(0, 0)
+    print a.get_pro(100, 1000)
+    print a.get_pro(1, 1000)
+    b = Pro_estimate()
+    b.solve_function(0.1)
+    b.set_array()
+    # print b.get_pro(0,0)
+    print b.get_pro(1, 1000)
