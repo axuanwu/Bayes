@@ -26,7 +26,7 @@ class READ_Bought_History():
         self.class_dict = {}
         self.class_num = -1  # 记录最大编号 +1为分类数
         # 热度排行初过滤参数  只对最畅销的 n 个商品进行精细计算
-        self.top_k = 20000
+        self.top_k = 60000
         self.simple = True
         # 分类别关联性 商品热度统计
         self.num_k = 5  # 邻近的num_k个自身算第一个 被认为有关联
@@ -354,9 +354,9 @@ if __name__ == "__main__":
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    # a.class_item_hot()
+    a.class_item_hot()
     # print time.time(), 4
-    a.read_write_class_item_hot('r')
+    a.read_write_class_item_hot()
     a.my_test()
     print time.time(), 5
     a.calculate_all()
