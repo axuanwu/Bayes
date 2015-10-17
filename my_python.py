@@ -333,7 +333,7 @@ class READ_Bought_History():
 
     # 计算所有的商品列表
     def calculate_all(self):
-        w_stream = open(os.path.join(self.data_dir, 'my_result.txt'), 'w')
+        w_stream = open(os.path.join(self.data_dir, 'fm_submissions.txt'), 'w')
         iii = 0
         for item_user_str in self.test_list:
             string0 = self.calculate_item_list(item_user_str)
