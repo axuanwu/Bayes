@@ -6,7 +6,7 @@ import time
 import datetime
 from pro_estimate import Pro_estimate
 import math
-
+from yewu_jingyan import exp_of_people
 
 class READ_Bought_History():
     def __init__(self):
@@ -19,14 +19,14 @@ class READ_Bought_History():
         # 商品热度统计数据
         self.item_num = -1  # 记录最大编号 +1为商品数
         self.item_dict = {}
-        self.item_array = np.zeros((2000000, 2), int)
+        self.item_array = np.zeros((2000000, 2))
         self.item_user_list = []
         # 商品分类信息
         self.item_class = np.zeros([0] * 20)
         self.class_dict = {}
         self.class_num = -1  # 记录最大编号 +1为分类数
         # 热度排行初过滤参数  只对最畅销的 n 个商品进行精细计算
-        self.top_k = 60000
+        self.top_k = 100000
         self.simple = True
         # 分类别关联性 商品热度统计
         self.num_k = 5  # 邻近的num_k个自身算第一个 被认为有关联
@@ -38,6 +38,13 @@ class READ_Bought_History():
         self.temp_item_array_hot = np.array([0] * 10)
         # 结果输出相关参数
         self.r_top_num = 200  # 取前200个商品
+        # 购买次序相关的权重
+        self.range = 10  # 购买次序的有效关联范围
+        self.day_diff = 3  # 时间差 不超过3天
+        self.order_weight = []
+        # 达人的人工经验
+        self.peo_exp = exp_of_people()
+        self.peo_exp.read_jingyan()
 
     def read_history(self):
         # 将购买物品
@@ -91,14 +98,22 @@ class READ_Bought_History():
         item_array_order = np.argsort(-self.item_array[:, 1])  # 降序排序
         # 根据商品热度 重新排序存储  对前top_k商品hash索引
         self.item_array = self.item_array[item_array_order, :]
+        self.item_array[:, 1] = self.item_array / (self.record_num + 1)  # 记录次数 转为 记录概率
         for x in xrange(0, self.item_num + 1):
-            self.item_dict[self.item_array[x, 0]] = x
-
+            self.item_dict[int(self.item_array[x, 0])] = x
 
     def read_class_id(self):
-        # 都区每个类别的情况：
-
-
+        # 读取每个类别的情况：
+        read_path = os.path.join(self.data_dir, 'class_hot.txt')
+        read_stream = open(read_path, 'r')
+        class_index = 0
+        for line_i in read_stream:
+            my_str = line_i.split()
+            if int(my_str[2]) == 1 or int(my_str[1]) <= 5:
+                continue
+            self.class_dict[int(my_str[0])] = class_index
+            class_index += 1
+        self.class_num = class_index - 1  # 最大编号  +1 位分类数
         # 读取每个商品的类别编号
         self.item_class = np.array([0] * (self.item_num + 1))
         read_path = os.path.join(self.data_dir, 'dim_items.txt')
@@ -124,15 +139,19 @@ class READ_Bought_History():
 
     def class_item_hot(self):
         # 各类商品 关联商品热度 统计结果为购买某一类商品后 其他各个商品出现其后的概率
-        self.like_matrix = np.zeros((self.top_k + 1, self.class_num + 1), float)  # 最后一行记录残余项
+        self.like_matrix = np.zeros((self.top_k + 1, self.class_num + 1))  # 最后一行记录残余项
         # 关联数
-        temp_array = np.array([-1] * self.num_k)  #
+        temp_array = np.array([-1] * self.range)  #
         index_temp = 0
         for i_record in xrange(0, self.record_num + 1):
             temp = self.user_item_array[i_record,]  # 商品  时间差
+            # 向前看n个商品
+            i_diff = 0
+            while i_diff < self.range:
+                if i_record
             # 某用户的第一个商品
             if temp[1] == 0:
-                temp_array = np.array([-1] * self.num_k)
+                temp_array = np.array([-1] * self.range)
                 index_temp = 0
             item_index = self.item_dict.get(temp[0], 0)  # 最后一行为残余项求和
             class_id = self.item_class[item_index]
@@ -157,9 +176,9 @@ class READ_Bought_History():
             if item_index % 200 == 0:
                 print time.time()
             if item_index == self.top_k:
-                p_pre = 1 - 1.0 * sum(self.item_array[0:self.top_k, 1]) / (self.record_num + 1)
+                p_pre = 1 - sum(self.item_array[0:self.top_k, 1])
             else:
-                p_pre = 1.0 * self.item_array[item_index, 1] / (self.record_num + 1)
+                p_pre = self.item_array[item_index, 1]
             if abs(1 - p_pre / p_pre_before) > 0.01:
                 # 本次的原假设与已经存储的原假设差别较大 重置先验分布
                 pes.solve_function(p_pre)
@@ -169,7 +188,7 @@ class READ_Bought_History():
                 self.like_matrix[item_index, class_index] = \
                     pes.get_pro(self.like_matrix[item_index, class_index], col_sum[class_index])
 
-    def read_write_class_item_hot(self, my_type="w", file="class_item_hot.txt"):
+    def read_write_class_item_hot(self, my_type="w", file="class_item_hot2.txt"):
         if my_type == "w":
             w_stream = open(os.path.join(self.data_dir, file), 'w')
             # 表头
@@ -228,34 +247,32 @@ class READ_Bought_History():
                 temp_str += ',' + str(temp_item[1])
         self.test_list.append(temp_str)
 
+    # 读取次序的权重系数
+    def set_weight(self, range=10):
+        self.range = range
+        self.order_weight = np.array([0.0] * range)
+        r_path = os.path.join(self.data_dir, "次序关联.txt".decode("utf8"))
+        r_stream = open(r_path, 'r')
+        i_line = -1
+        for line_i in r_stream:
+            if i_line == -1:
+                i_line += 1
+                continue
+            my_str = line_i.strip().split('\t')
+            if abs(int(my_str[0])) <= range:
+                self.order_weight[abs(int(my_str[0])) - 1] += 0.5 * float(my_str[3])
+        self.order_weight = self.order_weight / max(self.order_weight)
+
+
     # 利用全局热度 扩展到 某一个分类的热度分布
     def all_2_class(self, class_index):
-        zhi_shu = 1.0 * self.like_matrix[self.top_k, class_index] * (self.record_num + 1) / sum(
-            self.item_array[self.top_k:, 1])
-        self.temp_item_array_hot = zhi_shu * self.item_array[:, 1] / (self.record_num + 1)
-        self.temp_item_array_hot[0:self.top_k] = self.like_matrix[0:self.top_k, class_index]
-        # # 尾数重分布 : 前top_k个商品使用统计分布， 残余的冷门商品利用总次数按照全局统计的结果进行分布
-        # # self.temp_item_array_hot = np.array([0.0]*(self.item_num + 1))
-        # zhi_shu = 1.0 * self.like_matrix[self.top_k,class_index] / sum(self.item_array[self.top_k:,1])  # 某类别的残余项统计与全局残余项对比
-        # self.temp_item_array_hot = zhi_shu * self.item_array[:,1]
-        # self.temp_item_array_hot[0:self.top_k] = self.like_matrix[0:self.top_k,class_index]
-        # num_total = sum(self.like_matrix[:,class_index])
-        # # 残余项 概率计算比例
-        # bi_li = 1.0*zhi_shu/num_total*(self.record_num+1)
-        # # 概率优化
-        # pes = Pro_estimate()
-        # # 前top_k个
-        # p_pre0 = 0
-        # num_total = sum(self.like_matrix[:,class_index])
-        # for i_item in xrange(0,self.item_num + 1):
-        # if self.simple and i_item>self.top_k:
-        # self.temp_item_array_hot[i_item] = bi_li * self.item_array[i_item,1] / (self.record_num+1)
-        # p_pre = 1.0 * self.item_array[i_item,1]/(self.record_num+1)
-        #     if p_pre != p_pre0:
-        #         p_pre0 = p_pre
-        #         pes.solve_function(p_pre)
-        #         pes.set_array()
-        #     self.temp_item_array_hot[i_item] = pes.get_pro(self.temp_item_array_hot[i_item],num_total)
+        # 未记录的分类
+        if class_index == -1:
+            self.temp_item_array_hot = self.item_array[:, 1]
+        else:
+            zhi_shu = self.like_matrix[self.top_k, class_index] / sum(self.item_array[self.top_k:, 1])
+            self.temp_item_array_hot = zhi_shu * self.item_array[:, 1]
+            self.temp_item_array_hot[0:self.top_k] = self.like_matrix[0:self.top_k, class_index]
 
     # 后邻的n个商品意见组合方式 目前 简单求和
     def union_pro(self, temp_result):
@@ -339,7 +356,7 @@ class READ_Bought_History():
 
     # 计算所有的商品列表
     def calculate_all(self):
-        w_stream = open(os.path.join(self.data_dir, 'fm_submissions.txt'), 'w')
+        w_stream = open(os.path.join(self.data_dir, 'fm_submissions2.txt'), 'w')
         iii = 0
         for item_user_str in self.test_list:
             string0 = self.calculate_item_list(item_user_str)
@@ -352,6 +369,7 @@ class READ_Bought_History():
 
 if __name__ == "__main__":
     a = READ_Bought_History()
+    a.set_weight()
     print time.time(), 0
     a.read_history()
     a.set_top_k()  # 关注主要热度商品参数设置
