@@ -131,11 +131,12 @@ if __name__ == "__main__":
     b.set_array()
     # print b.get_pro(0,0)
     print b.get_pro(0, 10)
-    b.solve_function(0.1)
+    b.solve_function(0.01)
     b.set_array()
-    print b.get_pro(1, 10)
+    print b.get_pro(0, 0)
+    print b.get_pro(1, 100)
     a1 = b.get_pro(2, 10)
-    b.solve_function(0.4)
+    b.solve_function(0.01)
     b.set_array()
-    a2 = b.get_pro(3, 10)
-    print  a1 + a2
+    a2 = b.get_pro(100, 100)
+    print  a2

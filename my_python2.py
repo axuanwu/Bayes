@@ -14,7 +14,7 @@ class READ_Bought_History():
         self.user_dict = {}
         self.user_num = -1
         self.record_num = -1  # 记录最大编号 +1 为购买记录数
-        self.user_array = np.zeros((2000000, 2), int)
+        self.user_array = np.zeros((2000000, 2), int)  # 记录 购买行为的 起末位置
         self.user_item_array = np.zeros((20000000, 2), int)
         # 商品热度统计数据
         self.item_num = -1  # 记录最大编号 +1为商品数
@@ -98,7 +98,7 @@ class READ_Bought_History():
         item_array_order = np.argsort(-self.item_array[:, 1])  # 降序排序
         # 根据商品热度 重新排序存储  对前top_k商品hash索引
         self.item_array = self.item_array[item_array_order, :]
-        self.item_array[:, 1] = self.item_array / (self.record_num + 1)  # 记录次数 转为 记录概率
+        self.item_array[:, 1] = self.item_array[:, 1] / (self.record_num + 1)  # 记录次数 转为 记录概率
         for x in xrange(0, self.item_num + 1):
             self.item_dict[int(self.item_array[x, 0])] = x
 
@@ -134,43 +134,62 @@ class READ_Bought_History():
         # 设置top_k
         self.top_k = a
 
-    def add_circle(self, index, a=1):
-        return (index + a + self.num_k) % self.num_k
 
     def class_item_hot(self):
         # 各类商品 关联商品热度 统计结果为购买某一类商品后 其他各个商品出现其后的概率
         self.like_matrix = np.zeros((self.top_k + 1, self.class_num + 1))  # 最后一行记录残余项
         # 关联数
-        temp_array = np.array([-1] * self.range)  #
-        index_temp = 0
-        for i_record in xrange(0, self.record_num + 1):
-            temp = self.user_item_array[i_record,]  # 商品  时间差
-            # 向前看n个商品
-            i_diff = 0
-            while i_diff < self.range:
-                if i_record
-            # 某用户的第一个商品
-            if temp[1] == 0:
-                temp_array = np.array([-1] * self.range)
-                index_temp = 0
-            item_index = self.item_dict.get(temp[0], 0)  # 最后一行为残余项求和
-            class_id = self.item_class[item_index]
-            class_index = self.class_dict[class_id]  # 商品类别列编号
-            temp_array[index_temp] = class_index
-            item_index = min(item_index, self.top_k)
-            # 前top_k个类别在的此商品上+1
-            for x in xrange(0, self.num_k):
-                class_id0 = self.add_circle(index_temp, -x)
-                class_index0 = temp_array[class_id0]
-                if class_index0 == -1:
-                    break
-                self.like_matrix[item_index, class_index0] += 1
-            index_temp = self.add_circle(index_temp, 1)  # 下一个位置
+        for i_user in xrange(0, self.user_num + 1):
+            for i_record in xrange(self.user_array[i_user, 0], self.user_array[i_user, 1]):
+                if (i_record > self.user_array[i_user, 0]) and \
+                        (self.user_item_array[i_record, 0] == self.user_item_array[i_record - 1, 0]):
+                    continue  # 连续的购买相同商品
+                temp = self.user_item_array[i_record,]  # 商品  时间差
+                class_index = self.class_dict.get(temp[0], -1)
+                if class_index == -1:
+                    continue
+                # 向前看n个商品
+                i_diff = 0
+                while i_diff < self.range:
+                    pre_ind = i_record - 1 - i_diff
+                    if pre_ind >= self.user_array[i_user, 0]:  # 同一用户的记录范围内
+                        temp_now = self.user_item_array[pre_ind, :]
+                        if (temp[1] - temp_now[1]) <= self.day_diff:  # 时间范围内
+                            item_index = self.item_dict.get(temp_now[0], -1)
+                            item_index = min(item_index, self.top_k)  # top+1列存储其他所有
+                            if item_index != -1:
+                                self.like_matrix[item_index, class_index] += self.order_weight[i_diff]
+                            else:
+                                continue
+                        else:
+                            break
+                        i_diff += 1
+                    else:
+                        break
+                # 向后看n个商品
+                i_diff = 0
+                while i_diff < self.range:
+                    suf_ind = i_record + 1 + i_diff
+                    if suf_ind < self.user_array[i_user, 1]:  # 此处为 小于号
+                        temp_now = self.user_item_array[suf_ind, :]
+                        if (temp_now[1] - temp[1]) <= self.day_diff:  # 时间范围内
+                            item_index = self.item_dict.get(temp_now[0], -1)
+                            item_index = min(item_index, self.top_k)  # top+1列存储其他所有
+                            if item_index != -1:
+                                self.like_matrix[item_index, class_index] += self.order_weight[i_diff]
+                            else:
+                                continue
+                        else:
+                            break
+                        i_diff += 1
+                    else:
+                        break
         # 将 like_matrix 直接转化为概率
         col_sum = self.like_matrix.sum(0)  # 按照列 求和
         # row_sum = self.like_matrix.sum(1)  # 按照行 求和
         pes = Pro_estimate()
         p_pre_before = -1  # 上一次计算的先验概率
+        un_set = True
         for item_index in xrange(0, self.top_k + 1):
             # 前 top_k  个是商品 最后一项为残余项
             if item_index % 200 == 0:
@@ -182,11 +201,18 @@ class READ_Bought_History():
             if abs(1 - p_pre / p_pre_before) > 0.01:
                 # 本次的原假设与已经存储的原假设差别较大 重置先验分布
                 pes.solve_function(p_pre)
-                pes.set_array()
+                un_set = True
                 p_pre_before = p_pre
             for class_index in xrange(0, self.class_num + 1):
-                self.like_matrix[item_index, class_index] = \
-                    pes.get_pro(self.like_matrix[item_index, class_index], col_sum[class_index])
+                if self.like_matrix[item_index, class_index] > 50:
+                    self.like_matrix[item_index, class_index] = \
+                        self.like_matrix[item_index, class_index] / col_sum[class_index]
+                else:
+                    if un_set:
+                        un_set = False
+                        pes.set_array()
+                    self.like_matrix[item_index, class_index] = \
+                        pes.get_pro(self.like_matrix[item_index, class_index], col_sum[class_index])
 
     def read_write_class_item_hot(self, my_type="w", file="class_item_hot2.txt"):
         if my_type == "w":
@@ -274,12 +300,6 @@ class READ_Bought_History():
             self.temp_item_array_hot = zhi_shu * self.item_array[:, 1]
             self.temp_item_array_hot[0:self.top_k] = self.like_matrix[0:self.top_k, class_index]
 
-    # 后邻的n个商品意见组合方式 目前 简单求和
-    def union_pro(self, temp_result):
-        k = 1.0
-        for x in xrange(0, len(temp_result)):
-            k *= (1 - temp_result[x])
-        return 1 - k
 
     # 统计该商品的关联商品分布 并返回序列
     def count_items(self, item_id, user_str):
@@ -290,56 +310,104 @@ class READ_Bought_History():
         """
         # 空的 user 列表
         if user_str[0:2] == '-1':
+            peo_result = self.peo_exp.associated_items(item_id)
+            result_str = str(item_id) + ' '
+            num1 = 0
+            for temp_item_id in peo_result:
+                result_str += str(temp_item_id) + ','
+                num1 += 1
             my_orders = np.argsort(-self.temp_item_array_hot)
-            result_str = str(item_id) + ' ' + str(self.item_array[my_orders[0], 0])
-            for i_order in xrange(1, self.r_top_num):
-                result_str += ',' + str(self.item_array[my_orders[i_order], 0])
+            result_str += str(int(self.item_array[my_orders[0], 0]))
+            for i_order in xrange(1, self.r_top_num - num1):
+                result_str += ',' + str(int(self.item_array[my_orders[i_order], 0]))
             return result_str
-        k_step = self.num_k  # 认为紧接前K个商品之间有匹配关系
-        result_matrix = np.zeros((self.item_num + 1, k_step))
+        # k_step = self.range  # 认为紧接前K个商品之间有匹配关系
+        result_array = np.zeros(self.item_num + 1)
         user_list = user_str.split(',')
         for user in user_list:
             user_index = self.user_dict[int(user)]
-            i_record = self.user_array[user_index, 0]  # 用户开始的记录
-            start = False  # 统计开始的标志
-            k = 0
-            while i_record < self.user_array[user_index, 1]:
-                if self.user_item_array[i_record, 0] == item_id:
-                    start = True
-                    k = 0  # 统计的个数  1开始计数
-                elif start & (k < k_step):
-                    temp_item = self.user_item_array[i_record, 0]
-                    item_index = self.item_dict[temp_item]
-                    result_matrix[item_index, k] += 1  # 对应位置+1
-                    k += 1
-                i_record += 1
+            for i_record in xrange(self.user_array[user_index, 0], self.user_array[user_index, 1]):
+                if (i_record > self.user_array[user_index, 0]) and \
+                        (self.user_item_array[i_record, 0] == self.user_item_array[i_record - 1, 0]):
+                    continue  # 连续的购买相同商品
+                temp = self.user_item_array[i_record,]  # 商品  时间差
+
+                # 向前看n个商品
+                i_diff = 0
+                while i_diff < self.range:
+                    pre_ind = i_record - 1 - i_diff
+                    if pre_ind >= self.user_array[user_index, 0]:  # 同一用户的记录范围内
+                        temp_now = self.user_item_array[pre_ind, :]
+                        if (temp[1] - temp_now[1]) <= self.day_diff:  # 时间范围内
+                            item_index = self.item_dict.get(temp_now[0], -1)
+                            if item_index != -1:
+                                result_array[item_index] += self.order_weight[i_diff]
+                            else:
+                                continue
+                        else:
+                            break
+                        i_diff += 1
+                    else:
+                        break
+                # 向后看n个商品
+                i_diff = 0
+                while i_diff < self.range:
+                    suf_ind = i_record + 1 + i_diff
+                    if suf_ind < self.user_array[user_index, 1]:  # 此处为 小于号
+                        temp_now = self.user_item_array[suf_ind, :]
+                        if (temp_now[1] - temp[1]) <= self.day_diff:  # 时间范围内
+                            item_index = self.item_dict.get(temp_now[0], -1)
+                            if item_index != -1:
+                                result_array[item_index] += self.order_weight[i_diff]
+                            else:
+                                continue
+                        else:
+                            break
+                        i_diff += 1
+                    else:
+                        break
+        # 将 result_array 直接转化为概率
         # 计算统计 该商品的关联性质
-        col_sum = result_matrix.sum(0)  # 按照列 求和
-        row_sum = result_matrix.sum(1)  # 按照行 求和
-        temp_result_array = np.zeros((20000, 2))  # 存储 计算结果
-        temp_result = np.array([0.0] * len(col_sum))
-        my_orders = np.argsort(-self.temp_item_array_hot)  # 概率 降序 取序号
+        array_sum = sum(result_array)  # 按照列 求和
+        temp_result_array = np.zeros((600, 2))  # 存储 计算结果
+        result_dict = {}
+        my_orders1 = np.argsort(-result_array)  # 类依据 概率 降序 取序号
+        my_orders2 = np.argsort(-self.temp_item_array_hot)
+        peo_result = self.peo_exp.associated_items(item_id)
         i_temp_result = 0
+        for temp_item_id in peo_result:
+            temp_item_index = self.item_dict.get(temp_item_id, 0)
+            temp_result_array[i_temp_result, :] = [temp_item_id, 1 + result_array[temp_item_index] / array_sum]
+            result_dict[temp_item_index] = i_temp_result
+            i_temp_result += 1
         pes = Pro_estimate()
-        for i_order in xrange(0, self.item_num + 1):
-            temp_item_index = my_orders[i_order]  # 商品的下标
-            # 优化原假设 self.temp_item_array_hot
-            if (i_order < self.r_top_num) | (row_sum[temp_item_index] > 0):
-                try:
-                    pes.solve_function(self.temp_item_array_hot[temp_item_index])
-                except:
-                    print self.temp_item_array_hot[temp_item_index]
-                pes.set_array()
-                for i in xrange(0, len(col_sum)):
-                    temp_result[i] = pes.get_pro(result_matrix[temp_item_index, i], col_sum[i])
-                temp_pro = self.union_pro(temp_result)
-                temp_result_array[i_temp_result] = [self.item_array[temp_item_index, 0], temp_pro]  # 记录商品 其概率结果
-                i_temp_result += 1
-                if i_temp_result == 20000:  # 超出记录空间 断出
-                    break
+        # 计算类建议中最大的200个
+        for i_order in xrange(0, self.r_top_num):
+            temp_item_index = my_orders2[i_order]  # 商品的下标
+            if result_dict.get(temp_item_index, -1) != -1:
+                continue
+            pes.solve_function(self.temp_item_array_hot[temp_item_index])
+            pes.set_array()
+            temp_pro = pes.get_pro(result_array[temp_item_index], array_sum)
+            temp_result_array[i_temp_result, :] = [self.item_array[temp_item_index, 0], temp_pro]
+            result_dict[temp_item_index] = i_temp_result
+            i_temp_result += 1
+        # 计算同类用户的建议中的最大 400个
+        for i_order in xrange(0, self.r_top_num * 2):
+            temp_item_index = my_orders1[i_order]  # 商品的下标
+            if result_dict.get(temp_item_index, -1) != -1:
+                continue
+            pes.solve_function(self.temp_item_array_hot[temp_item_index])
+            pes.set_array()
+            temp_pro = pes.get_pro(result_array[temp_item_index], array_sum)
+            temp_result_array[i_temp_result, :] = [self.item_array[temp_item_index, 0], temp_pro]
+            result_dict[temp_item_index] = i_temp_result
+            i_temp_result += 1
+            if result_array[i_order] == 0:
+                break
         temp_result_array = temp_result_array[0:i_temp_result, :]
         temp_order = np.argsort(-temp_result_array[:, 1])  # 按照概率降序排列
-        result_str = str(item_id) + ' ' + str(temp_result_array[temp_order[0], 0])
+        result_str = str(item_id) + ' ' + str(int(temp_result_array[temp_order[0], 0]))
         for i in xrange(1, self.r_top_num):
             result_str += ',' + str(int(temp_result_array[temp_order[i], 0]))
         return result_str
@@ -372,15 +440,14 @@ if __name__ == "__main__":
     a.set_weight()
     print time.time(), 0
     a.read_history()
-    a.set_top_k()  # 关注主要热度商品参数设置
     print time.time(), 1
     a.item_hot()
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    a.class_item_hot()
+    # a.class_item_hot()
     # print time.time(), 4
-    a.read_write_class_item_hot()
+    a.read_write_class_item_hot('r')
     a.my_test()
     print time.time(), 5
     a.calculate_all()
