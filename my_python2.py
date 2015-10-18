@@ -8,6 +8,7 @@ from pro_estimate import Pro_estimate
 import math
 from yewu_jingyan import exp_of_people
 
+
 class READ_Bought_History():
     def __init__(self):
         self.data_dir = 'E:\\gitshell\\tianchi'
@@ -127,7 +128,7 @@ class READ_Bought_History():
                 # 记录商品类别数目
                 # if self.class_dict.get(int(aa[1]), -1) == -1:
                 # self.class_num += 1
-                #     self.class_dict[int(aa[1])] = self.class_num  # 给类别分配编号
+                # self.class_dict[int(aa[1])] = self.class_num  # 给类别分配编号
         read_stream.close()
 
     def set_top_k(self, a=20000):
@@ -256,14 +257,18 @@ class READ_Bought_History():
         item_id = 0
         temp_str = ''
         first = True
+        num_all = 0
+        num_1 = 0
         for line_i in read_stream:
             a = line_i.strip().split('\t')
             # 增加 未有购买记录的商品处理方式
             if a[1] == 'None':
                 a[1] = -1
+                num_1 += 1
             temp_item = [int(a[0]), int(a[1])]
             if item_id != temp_item[0]:
                 item_id = temp_item[0]
+                num_all += 1
                 if first == True:
                     first = False
                 else:
@@ -272,6 +277,7 @@ class READ_Bought_History():
             else:
                 temp_str += ',' + str(temp_item[1])
         self.test_list.append(temp_str)
+        print num_1, num_all
 
     # 读取次序的权重系数
     def set_weight(self, range=10):
@@ -438,6 +444,7 @@ class READ_Bought_History():
 if __name__ == "__main__":
     a = READ_Bought_History()
     a.set_weight()
+    a.my_test()
     print time.time(), 0
     a.read_history()
     print time.time(), 1
@@ -448,7 +455,6 @@ if __name__ == "__main__":
     # a.class_item_hot()
     # print time.time(), 4
     a.read_write_class_item_hot('r')
-    a.my_test()
     print time.time(), 5
     a.calculate_all()
     print time.time(), 6
