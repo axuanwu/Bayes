@@ -11,7 +11,7 @@ from yewu_jingyan import exp_of_people
 
 class READ_Bought_History():
     def __init__(self):
-        self.data_dir = 'E:\\gitshell\\tianchi'
+        self.data_dir = 'E:\\gitshell\\tianchi2'
         self.user_dict = {}
         self.user_num = -1
         self.record_num = -1  # 记录最大编号 +1 为购买记录数
@@ -292,7 +292,7 @@ class READ_Bought_History():
                 continue
             my_str = line_i.strip().split('\t')
             if abs(int(my_str[0])) <= range:
-                self.order_weight[abs(int(my_str[0])) - 1] += 0.5 * float(my_str[3])
+                self.order_weight[abs(int(my_str[0])) - 1] += 0.5 * (float(my_str[3]) - 0.0006)
         self.order_weight = self.order_weight / max(self.order_weight)
 
 
@@ -452,9 +452,9 @@ if __name__ == "__main__":
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    # a.class_item_hot()
-    # print time.time(), 4
-    a.read_write_class_item_hot('r')
+    a.class_item_hot()
+    print time.time(), 4
+    a.read_write_class_item_hot()
     print time.time(), 5
     a.calculate_all()
     print time.time(), 6

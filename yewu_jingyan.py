@@ -12,7 +12,25 @@ class exp_of_people():
         pass
 
     def read_jingyan(self):
-        opath = "E:\\gitshell\\tianchi\\dim_fashion_matchsets2.txt"
+        def my_ShangPinGuanLian():
+            path = "E:\\gitshell\\tianchi2\\dim_fashion_matchsets.txt"
+            opath = "E:\\gitshell\\tianchi2\\dim_fashion_matchsets2.txt"
+            read_stream = open(path, 'r')
+            write_stream = open(opath, 'w')
+            for line in read_stream:
+                aaa = line.rstrip().split(' ')
+                key = int(aaa[0])
+                item_list = aaa[1].rstrip().split(';')
+                for i in xrange(0, len(item_list)):
+                    temp_str = str(key) + '\t' + str(i) + '\t'
+                    item_list2 = item_list[i].split(',')
+                    for temp_item in item_list2:
+                        write_stream.writelines(temp_str + temp_item + '\n')
+            read_stream.close()
+            write_stream.close()
+
+        my_ShangPinGuanLian()
+        opath = "E:\\gitshell\\tianchi2\\dim_fashion_matchsets2.txt"
         Read_stream = open(opath, "r")
         i_record = 0
         pre_ind1 = -1
@@ -60,4 +78,4 @@ class exp_of_people():
 if __name__ == "__main__":
     b = exp_of_people()
     b.read_jingyan()
-    print b.associated_items(419902)
+    print b.associated_items(893028)

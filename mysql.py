@@ -29,8 +29,8 @@ if False:
 # 统计 所有的的搭配数据 计算 搭配的产品主要的购买距离上的关系
 # 商品搭配数据
 def my_ShangPinGuanLian(curser):
-    path = "E:\\gitshell\\tianchi\\dim_fashion_matchsets.txt"
-    opath = "E:\\gitshell\\tianchi\\dim_fashion_matchsets2.txt"
+    path = "E:\\gitshell\\tianchi2\\dim_fashion_matchsets.txt"
+    opath = "E:\\gitshell\\tianchi2\\dim_fashion_matchsets2.txt"
     read_stream = open(path, 'r')
     write_stream = open(opath, 'w')
     for line in read_stream:
