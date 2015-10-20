@@ -381,6 +381,7 @@ class READ_Bought_History():
         my_orders2 = np.argsort(-self.temp_item_array_hot)
         peo_result = self.peo_exp.associated_items(item_id)
         i_temp_result = 0
+        # 首先录入 人工产品
         for temp_item_id in peo_result:
             temp_item_index = self.item_dict.get(temp_item_id, 0)
             temp_result_array[i_temp_result, :] = [temp_item_id, 1 + result_array[temp_item_index] / array_sum]
@@ -388,10 +389,17 @@ class READ_Bought_History():
             i_temp_result += 1
         pes = Pro_estimate()
         # 计算类建议中最大的200个
-        for i_order in xrange(0, self.r_top_num):
+        item_index = self.item_dict.get(item_id, -1)
+        if item_index == -1:
+            class_id = -1
+        else:
+            class_id = self.item_class[item_index]
+        for i_order in xrange(0, self.item_num):
             temp_item_index = my_orders2[i_order]  # 商品的下标
+            if self.item_class[item_index] == class_id:
+                continue  # 类别相同
             if result_dict.get(temp_item_index, -1) != -1:
-                continue
+                continue  # 已经录入
             pes.solve_function(self.temp_item_array_hot[temp_item_index])
             pes.set_array()
             temp_pro = pes.get_pro(result_array[temp_item_index], array_sum)
@@ -399,17 +407,19 @@ class READ_Bought_History():
             result_dict[temp_item_index] = i_temp_result
             i_temp_result += 1
         # 计算同类用户的建议中的最大 400个
-        for i_order in xrange(0, self.r_top_num * 2):
+        for i_order in xrange(0, self.r_top_num * 3):
             temp_item_index = my_orders1[i_order]  # 商品的下标
+            if self.item_class[item_index] == class_id:
+                continue  # 类别相同
             if result_dict.get(temp_item_index, -1) != -1:
-                continue
+                continue  # 已经录入
             pes.solve_function(self.temp_item_array_hot[temp_item_index])
             pes.set_array()
             temp_pro = pes.get_pro(result_array[temp_item_index], array_sum)
             temp_result_array[i_temp_result, :] = [self.item_array[temp_item_index, 0], temp_pro]
             result_dict[temp_item_index] = i_temp_result
             i_temp_result += 1
-            if result_array[i_order] == 0:
+            if (result_array[i_order] == 0) or (i_temp_result > 400):
                 break
         temp_result_array = temp_result_array[0:i_temp_result, :]
         temp_order = np.argsort(-temp_result_array[:, 1])  # 按照概率降序排列
@@ -452,9 +462,9 @@ if __name__ == "__main__":
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    a.class_item_hot()
+    # a.class_item_hot()
     print time.time(), 4
-    a.read_write_class_item_hot()
+    a.read_write_class_item_hot('r')
     print time.time(), 5
     a.calculate_all()
     print time.time(), 6
