@@ -328,7 +328,7 @@ class READ_Bought_History():
                 result_str += ',' + str(int(self.item_array[my_orders[i_order], 0]))
             return result_str
         # k_step = self.range  # 认为紧接前K个商品之间有匹配关系
-        result_array = np.zeros(self.item_num + 1)
+        result_array = np.array([0.0] * (self.item_num + 1))
         user_list = user_str.split(',')
         for user in user_list:
             user_index = self.user_dict[int(user)]
@@ -394,9 +394,9 @@ class READ_Bought_History():
             class_id = -1
         else:
             class_id = self.item_class[item_index]
-        for i_order in xrange(0, self.item_num):
+        for i_order in xrange(0, self.r_top_num):
             temp_item_index = my_orders2[i_order]  # 商品的下标
-            if self.item_class[item_index] == class_id:
+            if self.item_class[temp_item_index] == class_id:
                 continue  # 类别相同
             if result_dict.get(temp_item_index, -1) != -1:
                 continue  # 已经录入
@@ -407,9 +407,9 @@ class READ_Bought_History():
             result_dict[temp_item_index] = i_temp_result
             i_temp_result += 1
         # 计算同类用户的建议中的最大 400个
-        for i_order in xrange(0, self.r_top_num * 3):
+        for i_order in xrange(0, self.item_num):
             temp_item_index = my_orders1[i_order]  # 商品的下标
-            if self.item_class[item_index] == class_id:
+            if self.item_class[temp_item_index] == class_id:
                 continue  # 类别相同
             if result_dict.get(temp_item_index, -1) != -1:
                 continue  # 已经录入
@@ -419,7 +419,7 @@ class READ_Bought_History():
             temp_result_array[i_temp_result, :] = [self.item_array[temp_item_index, 0], temp_pro]
             result_dict[temp_item_index] = i_temp_result
             i_temp_result += 1
-            if (result_array[i_order] == 0) or (i_temp_result > 400):
+            if i_temp_result > 400:
                 break
         temp_result_array = temp_result_array[0:i_temp_result, :]
         temp_order = np.argsort(-temp_result_array[:, 1])  # 按照概率降序排列
