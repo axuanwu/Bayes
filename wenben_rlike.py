@@ -1,10 +1,12 @@
 # coding=utf-8
+import math
+
 __author__ = '01053185'
 import numpy as np
 import os
 from yewu_jingyan import exp_of_people
 import time
-
+from pro_estimate2 import Pro_estimate
 
 class most_like():
     def __init__(self):
@@ -12,8 +14,9 @@ class most_like():
         # 词组
         self.word_num = 0
         self.dict_word = {}
+        self.top_k_word = 20000  # 详细计算前20000的商品
         self.word_M = np.zeros((1000000, 2))  # 第一列 记录word_id  第二列 记录 概率
-        self.word_item_array = [""] * 1000000  # 每个词贝哪些商品使用
+        self.word_item_array = [""] * 1000000  # 每个词被哪些商品使用
         # 需要预测的词组
         self.r_word_num = 0
         self.r_dict_word = {}
@@ -31,6 +34,7 @@ class most_like():
         # 读入商品搭配数据
         self.exp_peo = exp_of_people()
         # self.matrix_item = np.zeros((10000000,3))
+        self.pro_guji = Pro_estimate()
         pass
 
     def read_txt(self, filename="dim_items.txt"):
@@ -85,6 +89,9 @@ class most_like():
         for x in xrange(0, self.word_num):
             self.dict_word[int(self.word_M[x, 0])] = x
         r_stream.close()
+        # 转化word_M 第2 列 为概率：
+        sum_word_num = sum(self.word_M[:, 1])
+        self.word_M[:, 1] = self.word_M[:, 1] / sum_word_num
 
     def result_word(self, file_name='test_items2.txt'):
         file_name = os.path.join(self.data_dir, file_name)
@@ -128,10 +135,15 @@ class most_like():
                 item_array.append(int(item))
         return item_array
     # 统计词词
-    def my_tongji(self):
-        temp_array = np.zeros((1000, self.word_num), int)
+    def my_tongji1(self):
+        split_ss = self.r_word_num
+        temp_array = np.zeros((split_ss, self.top_k_word + 1))
+        p_remain = sum(self.word_M[self.top_k_word:, 1])  # 残余项原始概率
+        i_file = 0
+        file_name = "word_word_pro"
+        word_ind = 0
         for word_ind in xrange(0, self.r_word_num):
-            word_id = self.r_word_M[word_ind, 0]
+            word_id = int(self.r_word_M[word_ind, 0])
             item_array = self.get_item_array(word_id)
             for item_id in item_array:
                 item_array2 = self.exp_peo.associated_items(int(item_id))  # 关联商品
@@ -145,8 +157,34 @@ class most_like():
                             continue
                         word_array = word_str.split(',')
                         for word_id2 in word_array:
-                            word_ind2 = self.dict_word[int(word_id)]
-                            temp_array[word_ind, word_ind2] += 1
+                            word_ind2 = min(self.dict_word[int(word_id)], self.top_k_word)
+                            temp_array[word_ind, word_ind2] += 1  # word_ind 指示的词发生后其关联商品 为 含word_ind2的词 次数+1
+            if word_ind > 0 and ((word_ind % split_ss == 0) | (word_ind == self.r_word_num - 1)):
+                temp_array_sum = temp_array.sum(1)  # 按照行进行求和
+                (row_num, col_num) = temp_array.shape
+                for i_col in xrange(0, col_num):
+                    if i_col % 200 == 0:
+                        print i_col, time.time()
+                    if i_col == self.top_k_word:
+                        p_pre = p_remain
+                    else:
+                        p_pre = self.word_M[i_col, 1]
+                    for i_row in xrange(0, row_num):
+                        temp_array[i_row, i_col] = \
+                            self.pro_guji.get_pro_r(p_pre,
+                                                    temp_array[i_row, i_col],
+                                                    temp_array_sum[i_row])  # p n m
+                # 静态存储
+                i_file = math.floor(word_ind / split_ss)
+                w_file = os.path.join(self.data_dir, file_name + str(i_file) + '.txt')
+                w_stream = open(w_file, 'w')
+                for i_row in xrange(0, row_num):
+                    my_str = ''
+                    for i_col in xrange(0, col_num - 1):
+                        my_str += str(math.log(temp_array[i_row, i_col])) + ','
+                    my_str += str(math.log(temp_array[i_row, col_num - 1])) + '\n'
+                    w_stream.writelines(my_str)
+                w_stream.close()
         pass
 
 
@@ -154,5 +192,6 @@ if __name__ == "__main__":
     a = most_like()
     a.read_txt()
     a.result_word()
-    a.get_item_array(171811)
+    a.my_tongji1()
+    # a.get_item_array(171811)
     print a.r_word_num, a.r_word_M[a.r_word_num - 1, 1]

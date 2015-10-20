@@ -108,8 +108,11 @@ class Pro_estimate():
             if math.exp(self.alpha * start - 1 + self.beta) < 10 ** -12:
                 step = min_size
             else:
-                step = min(min_step / math.exp(self.alpha * start - 1 + self.beta), min_size)
-            step = max(10 ** -9, step)
+                if self.alpha * start - 1 + self.beta > 30:
+                    step = 10 ** -10
+                else:
+                    step = min(min_step / math.exp(self.alpha * start - 1 + self.beta), min_size)
+                    step = max(10 ** -10, step)
             step_end = min(start + step, 1)
             temp_x = 0.5 * (start + step_end)
             # temp_step_x = step_end - start
@@ -146,5 +149,5 @@ class Pro_estimate():
 
 if __name__ == "__main__":
     b = Pro_estimate()
-    print b.get_pro_r(0.01, 2, 100)
-    print b.get_pro_r(0.01032, 2, 100)
+    print b.get_pro_r(0.001, 2, 100)
+    print b.get_pro_r(0.000001032, 2, 100)
