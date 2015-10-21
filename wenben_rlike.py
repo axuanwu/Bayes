@@ -16,8 +16,9 @@ class most_like():
         self.word_num = 0
         self.dict_word = {}
         self.top_k_word = 20000  # 详细计算前20000的词组
-        self.word_M = np.zeros((1000000, 2))  # 第一列 记录word_id  第二列 记录 概率
+        self.word_M = np.zeros((1000000, 2))  # 第一列 记录word_id  第二列 记录 概率对数
         self.word_item_array = [""] * 1000000  # 每个词被哪些商品使用
+        self.word_word = np.zeros((3, 3))
         # 需要预测的词组
         self.r_word_num = 0
         self.r_dict_word = {}
@@ -25,11 +26,11 @@ class most_like():
         self.test_item = []
         # 商品
         self.dict_item = {}
-        self.item_M = np.zeros((600000, 2), int)
+        self.item_M = np.zeros((600000, 2), int)  # item_id  类别编号
         self.item_word_array = [""] * 600000
         self.item_num = 0
         # 类别
-        self.class_M = np.zeros((3000000, 2))  # 类别id  类别商品计数
+        self.class_M = np.zeros((3000000, 2))  # 类别id  类别商品计数/ 概率对数
         self.dict_class = {}
         self.class_num = 0
         self.class_class = np.zeros((2, 2))
@@ -66,11 +67,11 @@ class most_like():
                 if word_ind == -1:
                     self.dict_word[word_id] = self.word_num
                     self.word_M[self.word_num, :] = [word_id, 1]
-                    self.word_item_array[self.word_num] = my_str[0]  # 商品                    
+                    # self.word_item_array[self.word_num] = my_str[0]  # 商品
                     self.word_num += 1
                 else:
                     self.word_M[word_ind, 1] += 1
-                    self.word_item_array[word_ind] += ',' + my_str[0]  # 商品
+                    # self.word_item_array[word_ind] += ',' + my_str[0]  # 商品
             # 录入分类信息
             class_id = int(my_str[1])
             class_ind = self.dict_class.get(class_id, -1)
@@ -84,19 +85,22 @@ class most_like():
         self.word_M = self.word_M[0:self.word_num, :]
         self.item_M = self.item_M[0:self.item_num, :]
         self.item_word_array = self.item_word_array[0:self.item_num]
-        self.word_item_array = self.word_item_array[0:self.word_num]
+        # self.word_item_array = self.word_item_array[0:self.word_num]
         # 根据热度排行对词进行重新排序
         order = np.argsort(-self.word_M[:, 1])
         self.word_M = self.word_M[order, :]
-        temp_a = self.word_item_array
-        for x in xrange(0, len(order)):
-            self.word_item_array[x] = temp_a[order[x]]
+        # temp_a = self.word_item_array
+        # for x in xrange(0, len(order)):
+        # self.word_item_array[x] = temp_a[order[x]]
         for x in xrange(0, self.word_num):
             self.dict_word[int(self.word_M[x, 0])] = x
         r_stream.close()
-        # 转化word_M 第2 列 为概率：
+        # # 转化word_M 第2 列 为概率对数：
         sum_word_num = sum(self.word_M[:, 1])
-        self.word_M[:, 1] = self.word_M[:, 1] / sum_word_num
+        self.word_M[:, 1] = np.log(self.word_M[:, 1] / sum_word_num)
+        # 转化word_M 第2 列 为概率对数：
+        sum_class_num = sum(self.class_M[:, 1])
+        self.class_M[:, 1] = np.log(self.class_M[:, 1] / sum_class_num)
 
     def result_word(self, file_name='test_items2.txt'):
         file_name = os.path.join(self.data_dir, file_name)
@@ -198,12 +202,12 @@ class most_like():
         # 统计结果由 sql sever 完成后存为txt 这里直接读取
         r_path = os.path.join(self.data_dir, "class_class.txt")
         r_stream = open(r_path, 'r')
-        self.class_class = np.zeros(())
+        self.class_class = np.zeros((self.class_num, self.class_num))
         for line in r_stream:
             my_str = line.strip().split('\t')
             class_ind1 = self.dict_class[int(my_str[0])]
             class_ind2 = self.dict_class[int(my_str[1])]
-            num = self.dict_class[int(my_str[2])]
+            num = int(my_str[2])
             self.class_class[class_ind1, class_ind2] += num
         r_stream.close()
         row_sum = self.class_class.sum(1)  # 按照行求和
@@ -272,15 +276,87 @@ class most_like():
         w_stream.close()
         self.word_word = temp_array
 
+    # 读取之前计算的词词关系
+    def read_word_word(self):
+        self.word_word = np.zeros((self.r_word_num + 1, self.top_k_word + 1))
+        o_stream = open(os.path.join(self.data_dir, "word_word_pro0.txt"), 'r')
+        i_line = 0
+        for line in o_stream:
+            my_str = line.strip().split(',')
+            for x in xrange(0, self.top_k_word + 1):
+                self.word_word[i_line, x] = math.exp(float(my_str[x]))
+            i_line += 1
+        o_stream.close()
+        if i_line == (self.r_word_num + 1):
+            print time.time(), "good"
+
+    # 搭配算法 主进程
+    def da_pei(self):
+        file_name = os.path.join(self.data_dir, 'fm_submissions2_tag.txt')
+        w_stream = open(file_name, 'w')
+        for item_id in self.test_item:
+            item_ind = self.dict_item[item_id]
+            word_str = self.item_word_array[item_ind]
+            class_id = self.item_M[item_ind, 1]  # 类别编号
+            class_ind = self.dict_class[class_id]  # 类别索引
+            # item_id == self.class_M[item_ind,0]
+            temp_result_array = np.zeros((self.item_num, 2))  # 第一列记录词组的意见，第二列记录类别的意见 概率乘 化作 加
+            class_pro = np.log(self.class_class[class_ind, :])  # 搭配时 该商品类别到各个类别的概率
+            class_pro2 = self.class_M[:, 1]  # 不搭配时 该商品类别到各个类别的概率
+            temp_word_pro = np.array([0.0] * (self.top_k_word + 1))  # 该商品词组到各个词组的概率
+            word_num = 0
+            word_str_array = word_str.split(',')
+            # 获得该商品后 其他商品的输出概率
+            for word_id in word_str_array:
+                try:
+                    word_id2i = int(word_id)
+                except:
+                    continue
+                word_ind1 = self.r_dict_word.get(word_id2i, -1)
+                if word_ind1 == -1:
+                    continue  # 非统计对象
+                word_ind1 = min(word_ind1, self.r_word_num)
+                temp_word_pro += np.log(self.word_word[word_ind1, :])  # word_word 记录的是 真实概率
+                word_num += 1
+            temp_word_pro *= (1.0 / word_num)  # 搭配 平均词意见
+            temp_word_pro2 = self.word_M[:, 1]  # 不搭配 意见
+            for item_ind in xrange(0, self.item_num):
+                word_str = self.item_word_array[item_ind]
+                class_id = self.item_M[item_ind, 1]
+                class_ind00 = self.dict_class[int(class_id)]
+                temp_result_array[item_ind, 1] = class_pro[class_ind00] - class_pro2[class_ind00]  # 其exp 为搭配是 不搭配的倍数
+                if word_str == "":
+                    continue
+                word_str = word_str.split(',')
+                word_num2 = 0
+                for word_id2 in word_str:
+                    word_ind2 = self.dict_word.get(int(word_id2), -1)
+                    if word_ind2 == -1:
+                        continue
+                    word_ind2 = min(word_ind2, self.top_k_word)
+                    temp_result_array[item_ind, 0] += temp_word_pro[word_ind2] - temp_word_pro2[word_ind2]
+                    word_num2 += 1
+                temp_result_array[item_ind, 0] *= (1.0 / word_num2)
+            a = temp_result_array[:, 0] + temp_result_array[:, 1]  # 类别的意见， 加上词的意见
+            my_order = np.argsort(-a)  # 降序排序 并输出
+            # 将 前 200 个 写入文件
+            result_str = str(item_id) + ' ' + str(int(self.item_M[my_order[0], 0]))
+            for i in xrange(1, 200):
+                result_str += ',' + str(int(self.item_M[my_order[i], 0]))
+            w_stream.writelines(result_str + '\n')
+        pass
+
 
 if __name__ == "__main__":
     a = most_like()
     a.read_txt()
     a.result_word()
     print 1
-    a.my_tongji3()  # 统计 词词 关系
+    # a.my_tongji3()  # 统计 词词 关系
+    a.read_word_word()
     print 2
     a.my_tongji2()  # 统计 类类 关系
+    a.da_pei()
     print 3
     # a.get_item_array(171811)
-    print a.r_word_num, a.r_word_M[a.r_word_num - 1, 1]
+
