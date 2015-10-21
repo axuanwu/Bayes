@@ -40,7 +40,8 @@ class most_like():
         # self.matrix_item = np.zeros((10000000,3))
         # 概率优化模块
         self.pro_guji = Pro_estimate()
-
+        # 只考虑 最热的 6万 商品
+        self.item_top_k = 60000
         pass
 
     def read_txt(self, filename="dim_items.txt"):
@@ -290,11 +291,31 @@ class most_like():
         if i_line == (self.r_word_num + 1):
             print time.time(), "good"
 
+    # 根据热度重组商品矩阵
+    def read_item_hot(self):
+        path = os.path.join(self.data_dir, 'dim_items2.txt')
+        nums_array = np.array([0] * self.item_num)
+        r_stream = open(path, 'r')
+        for line_i in r_stream:
+            my_str = line_i.strip().split(' ')
+            item_id = int(my_str[0])
+            nums = int(my_str[3])
+            item_ind = self.dict_item[item_id]
+            nums_array[item_ind] = nums
+        r_stream.close()
+        a = np.argsort(-nums_array)
+        self.item_M = self.item_M[a, :]
+        for x in xrange(0, self.item_num):
+            self.dict_item[int(self.item_M[x, 0])] = x
     # 搭配算法 主进程
     def da_pei(self):
         file_name = os.path.join(self.data_dir, 'fm_submissions2_tag.txt')
         w_stream = open(file_name, 'w')
+        iii = -1
         for item_id in self.test_item:
+            iii += 1
+            if iii % 100 == 0:
+                print time.time(), iii
             item_ind = self.dict_item[item_id]
             word_str = self.item_word_array[item_ind]
             class_id = self.item_M[item_ind, 1]  # 类别编号
@@ -320,7 +341,7 @@ class most_like():
                 word_num += 1
             temp_word_pro *= (1.0 / word_num)  # 搭配 平均词意见
             temp_word_pro2 = self.word_M[:, 1]  # 不搭配 意见
-            for item_ind in xrange(0, self.item_num):
+            for item_ind in xrange(0, self.item_top_k):
                 word_str = self.item_word_array[item_ind]
                 class_id = self.item_M[item_ind, 1]
                 class_ind00 = self.dict_class[int(class_id)]
@@ -339,10 +360,15 @@ class most_like():
                 temp_result_array[item_ind, 0] *= (1.0 / word_num2)
             a = temp_result_array[:, 0] + temp_result_array[:, 1]  # 类别的意见， 加上词的意见
             my_order = np.argsort(-a)  # 降序排序 并输出
-            # 将 前 200 个 写入文件
-            result_str = str(item_id) + ' ' + str(int(self.item_M[my_order[0], 0]))
+            # 找出前6百个 按照热度进行排名 将 前 200 个 写入文件
+            top_top_k = 400  # 重要参数
+            temp_rrr = np.zeros((top_top_k, 2))
+            for i in xrange(0, top_top_k):
+                temp_rrr[i, :] = [self.item_M[my_order[i], 0], my_order[i]]
+            my_order = np.argsort(temp_rrr[:, 1])  # 按照序号排名  即热度
+            result_str = str(item_id) + ' ' + str(int(temp_rrr[my_order[0], 0]))
             for i in xrange(1, 200):
-                result_str += ',' + str(int(self.item_M[my_order[i], 0]))
+                result_str += ',' + str(int(temp_rrr[my_order[i], 0]))
             w_stream.writelines(result_str + '\n')
         pass
 
@@ -356,6 +382,7 @@ if __name__ == "__main__":
     a.read_word_word()
     print 2
     a.my_tongji2()  # 统计 类类 关系
+    a.read_item_hot()
     a.da_pei()
     print 3
     # a.get_item_array(171811)
