@@ -24,7 +24,7 @@ class Pro_estimate():
         self.set_array()
 
     def get_pro_r(self, pro_pre, n, m):
-        if abs(1.0 * n / m / pro_pre - 1) < 0.05:
+        if (m != 0) and (abs(1.0 * n / m / pro_pre - 1) < 0.05):
             return (0.5 * n / m + 0.5 * pro_pre)
         else:
             if abs(pro_pre / self.p_pre - 1) < 0.01:

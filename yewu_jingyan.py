@@ -78,4 +78,4 @@ class exp_of_people():
 if __name__ == "__main__":
     b = exp_of_people()
     b.read_jingyan()
-    print b.associated_items(893028)
+    print b.associated_items(754750)
