@@ -42,6 +42,8 @@ class most_like():
         self.pro_guji = Pro_estimate()
         # 只考虑 最热的 6万 商品
         self.item_top_k = 60000
+        # 原始的搭配概率
+        self.p_match = 0.006  # 任意随机商品 搭配的概率
         pass
 
     def read_txt(self, filename="dim_items.txt"):
@@ -378,6 +380,76 @@ class most_like():
             w_stream.writelines(result_str + '\n')
         pass
 
+    # 仅仅计算出所有结果前6万商品的搭配结果
+    # 加入了 原始的搭配概率 0.006，在 搭配中由于这一直大家相同，所以无关紧要。
+    # 这次会计算出前6万的搭配概率，供 my_python2 做 进一步筛查
+    def da_pei2(self):
+        file_name = os.path.join(self.data_dir, 'fm_submissions2_tag_m.txt')
+        w_stream = open(file_name, 'w')
+        iii = -1
+        for item_id in self.test_item:
+            iii += 1
+            if iii % 100 == 0:
+                print time.time(), iii
+            item_ind = self.dict_item[item_id]
+            word_str = self.item_word_array[item_ind]
+            class_id = self.item_M[item_ind, 1]  # 类别编号
+            class_ind = self.dict_class[class_id]  # 类别索引
+            # item_id == self.class_M[item_ind,0]
+            temp_result_array = np.zeros((self.item_num, 2))  # 第一列记录词组的意见，第二列记录类别的意见 概率乘 化作 加
+            class_pro = np.log(self.class_class[class_ind, :])  # 搭配时 该商品类别到各个类别的概率
+            class_pro2 = self.class_M[:, 1]  # 不搭配时 该商品类别到各个类别的概率
+            temp_word_pro = np.array([0.0] * (self.top_k_word + 1))  # 该商品词组发生后各个词组的概率
+            word_num = 0
+            word_str_array = word_str.split(',')
+            # 获得该商品后 其他商品的输出概率
+            for word_id in word_str_array:
+                try:
+                    word_id2i = int(word_id)
+                except:
+                    continue
+                word_ind1 = self.r_dict_word.get(word_id2i, -1)
+                if word_ind1 == -1:
+                    continue  # 非统计对象
+                word_ind1 = min(word_ind1, self.r_word_num)
+                temp_word_pro += np.log(self.word_word[word_ind1, :])  # word_word 记录的是 真实概率
+                word_num += 1
+            if word_num == 0:
+                temp_word_pro = self.word_M[:, 1]
+            else:
+                temp_word_pro *= (1.0 / word_num)  # 搭配 平均词意见
+            temp_word_pro2 = self.word_M[:, 1]  # 不搭配 意见
+            for item_ind in xrange(0, self.item_top_k):
+                word_str = self.item_word_array[item_ind]
+                class_id = self.item_M[item_ind, 1]
+                class_ind00 = self.dict_class[int(class_id)]
+                temp_result_array[item_ind, 1] = class_pro[class_ind00] - class_pro2[class_ind00]  # 其exp 为搭配是 不搭配发生的倍数
+                if word_str == "":
+                    continue
+                word_str = word_str.split(',')
+                word_num2 = 0
+                for word_id2 in word_str:
+                    word_ind2 = self.dict_word.get(int(word_id2), -1)
+                    if word_ind2 == -1:
+                        continue
+                    word_ind2 = min(word_ind2, self.top_k_word)
+                    temp_result_array[item_ind, 0] += temp_word_pro[word_ind2] - temp_word_pro2[word_ind2]
+                    word_num2 += 1
+                if word_num2 == 0:
+                    temp_result_array[item_ind, 0] = 0
+                else:
+                    temp_result_array[item_ind, 0] *= (1.0 / word_num2)
+            a = temp_result_array[:, 0] + temp_result_array[:, 1]  # 类别的意见， 加上词的意见 a元素 中存储的是
+            pro_a = self.p_match * np.exp(a) / (self.p_match * np.exp(a) + (1 - self.p_match) * 1)  # 得到各个商品 的概率
+            # my_str00 = ""
+            w_stream.writelines(str(item_id) + '\t')
+            for item_ind in xrange(0, self.item_top_k):
+                if item_ind != (self.item_top_k - 1):
+                    w_stream.writelines(str(pro_a[item_ind]) + '\t')
+                else:
+                    w_stream.writelines(str(pro_a[item_ind]) + '\n')
+        w_stream.close()
+
 
 if __name__ == "__main__":
     a = most_like()
@@ -389,7 +461,7 @@ if __name__ == "__main__":
     print 2
     a.my_tongji2()  # 统计 类类 关系
     a.read_item_hot()
-    a.da_pei()
+    a.da_pei2()  #
     print 3
     # a.get_item_array(171811)
 
