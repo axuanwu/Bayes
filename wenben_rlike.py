@@ -339,7 +339,10 @@ class most_like():
                 word_ind1 = min(word_ind1, self.r_word_num)
                 temp_word_pro += np.log(self.word_word[word_ind1, :])  # word_word 记录的是 真实概率
                 word_num += 1
-            temp_word_pro *= (1.0 / word_num)  # 搭配 平均词意见
+            if word_num == 0:
+                temp_word_pro = self.word_M[:, 1]
+            else:
+                temp_word_pro *= (1.0 / word_num)  # 搭配 平均词意见
             temp_word_pro2 = self.word_M[:, 1]  # 不搭配 意见
             for item_ind in xrange(0, self.item_top_k):
                 word_str = self.item_word_array[item_ind]
@@ -357,7 +360,10 @@ class most_like():
                     word_ind2 = min(word_ind2, self.top_k_word)
                     temp_result_array[item_ind, 0] += temp_word_pro[word_ind2] - temp_word_pro2[word_ind2]
                     word_num2 += 1
-                temp_result_array[item_ind, 0] *= (1.0 / word_num2)
+                if word_num2 == 0:
+                    temp_result_array[item_ind, 0] = 0
+                else:
+                    temp_result_array[item_ind, 0] *= (1.0 / word_num2)
             a = temp_result_array[:, 0] + temp_result_array[:, 1]  # 类别的意见， 加上词的意见
             my_order = np.argsort(-a)  # 降序排序 并输出
             # 找出前6百个 按照热度进行排名 将 前 200 个 写入文件
