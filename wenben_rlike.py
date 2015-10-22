@@ -294,7 +294,7 @@ class most_like():
             print time.time(), "good"
 
     # 根据热度重组商品矩阵
-    def read_item_hot(self):
+    def read_item_hot(self, write=True):
         path = os.path.join(self.data_dir, 'dim_items2.txt')
         nums_array = np.array([0] * self.item_num)
         r_stream = open(path, 'r')
@@ -309,6 +309,15 @@ class most_like():
         self.item_M = self.item_M[a, :]
         for x in xrange(0, self.item_num):
             self.dict_item[int(self.item_M[x, 0])] = x
+        # 记录商品热度
+        if write:
+            w_stream = open(os.path.join(self.data_dir, 'my_item_hot.txt'), 'w')
+            nums_array = nums_array[a]
+            for x in xrange(0, self.item_num):
+                w_stream.writelines(str(int(self.item_M[x, 0])) + '\t' + str(nums_array[x]) + '\n')
+            w_stream.close()
+
+
     # 搭配算法 主进程
     def da_pei(self):
         file_name = os.path.join(self.data_dir, 'fm_submissions2_tag.txt')
@@ -445,9 +454,9 @@ class most_like():
             w_stream.writelines(str(item_id) + '\t')
             for item_ind in xrange(0, self.item_top_k):
                 if item_ind != (self.item_top_k - 1):
-                    w_stream.writelines(str(pro_a[item_ind]) + '\t')
+                    w_stream.writelines(str(round(pro_a[item_ind], 7)) + '\t')
                 else:
-                    w_stream.writelines(str(pro_a[item_ind]) + '\n')
+                    w_stream.writelines(str(round(pro_a[item_ind], 7)) + '\n')
         w_stream.close()
 
 
@@ -461,7 +470,7 @@ if __name__ == "__main__":
     print 2
     a.my_tongji2()  # 统计 类类 关系
     a.read_item_hot()
-    a.da_pei2()  #
+    # a.da_pei2()  #
     print 3
     # a.get_item_array(171811)
 
