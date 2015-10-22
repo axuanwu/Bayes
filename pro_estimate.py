@@ -127,16 +127,7 @@ class Pro_estimate():
 
 if __name__ == "__main__":
     b = Pro_estimate()
-    b.solve_function(0.1)
+    b.solve_function(0.001)
     b.set_array()
-    # print b.get_pro(0,0)
-    print b.get_pro(0, 10)
-    b.solve_function(0.01)
-    b.set_array()
-    print b.get_pro(0, 0)
-    print b.get_pro(1, 100)
-    a1 = b.get_pro(2, 10)
-    b.solve_function(0.01)
-    b.set_array()
-    a2 = b.get_pro(100, 100)
+    a2 = b.get_pro(100, 10000)
     print  a2
