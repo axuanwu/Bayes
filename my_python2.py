@@ -5,6 +5,7 @@ import numpy as np
 import time
 import datetime
 from pro_estimate import Pro_estimate
+import pro_estimate2 as pro_es2
 import math
 from yewu_jingyan import exp_of_people
 
@@ -20,7 +21,7 @@ class READ_Bought_History():
         # 商品热度统计数据
         self.item_num = -1  # 记录最大编号 +1为商品数
         self.item_dict = {}
-        self.item_array = np.zeros((2000000, 2))
+        self.item_array = np.zeros((2000000, 2))  # 商品id， 商品数/概率
         self.item_user_list = []
         # 商品分类信息
         self.item_class = np.zeros([0] * 20)
@@ -46,6 +47,9 @@ class READ_Bought_History():
         # 达人的人工经验
         self.peo_exp = exp_of_people()
         self.peo_exp.read_jingyan()
+        # 搭配概率
+        self.top_k_da = 60000
+        self.pro_da_pei = np.array([0.0] * self.top_k_da)
 
     def read_history(self):
         # 将购买物品
@@ -67,7 +71,7 @@ class READ_Bought_History():
             if user_id_p != user_id:
                 # diyici
                 if self.record_num != 1:
-                    self.user_array[self.user_num, 1] = self.record_num  # 记录上一个词的末尾位置
+                    self.user_array[self.user_num, 1] = self.record_num  # 记录上一个用户的末尾位置
                 start_date = date_now
                 user_id_p = user_id
                 self.user_num += 1
@@ -99,6 +103,19 @@ class READ_Bought_History():
         item_array_order = np.argsort(-self.item_array[:, 1])  # 降序排序
         # 根据商品热度 重新排序存储  对前top_k商品hash索引
         self.item_array = self.item_array[item_array_order, :]
+        self.item_array[:, 1] = self.item_array[:, 1] / (self.record_num + 1)  # 记录次数 转为 记录概率
+        for x in xrange(0, self.item_num + 1):
+            self.item_dict[int(self.item_array[x, 0])] = x
+
+    def item_hot2(self):
+        # 读取文本分析中存储的商品顺序 确保商品存储位置完全一致
+        r_stream = open(os.path.join(self.data_dir, 'my_item_hot.txt'), 'r')
+        self.item_num = -1
+        for line in r_stream:
+            my_str = line.strip().split('\t')
+            self.item_num += 1
+            self.item_array[self.item_num, :] = [int(my_str[0]), int(my_str[1])]
+        self.item_array = self.item_array[0:(self.item_num + 1), ]
         self.item_array[:, 1] = self.item_array[:, 1] / (self.record_num + 1)  # 记录次数 转为 记录概率
         for x in xrange(0, self.item_num + 1):
             self.item_dict[int(self.item_array[x, 0])] = x
@@ -428,6 +445,110 @@ class READ_Bought_History():
             result_str += ',' + str(int(temp_result_array[temp_order[i], 0]))
         return result_str
 
+    # 统计该商品的关联商品分布 并返回序列
+    def count_items2(self, item_id, user_str):
+        """
+
+        :type item_id: 商品id 整数
+        :type user_str: item_id 的购买者列表 字符串，不同用户逗号间隔
+        """
+        # 空的 user 列表
+        if user_str[0:2] == '-1':
+            peo_result = self.peo_exp.associated_items(item_id)
+            result_str = str(item_id) + ' '
+            num1 = 0
+            for temp_item_id in peo_result:
+                result_str += str(temp_item_id) + ','
+                num1 += 1
+            my_orders = np.argsort(-self.temp_item_array_hot)
+            result_str += str(int(self.item_array[my_orders[0], 0]))
+            for i_order in xrange(1, self.r_top_num - num1):
+                result_str += ',' + str(int(self.item_array[my_orders[i_order], 0]))
+            return result_str
+        # k_step = self.range  # 认为紧接前K个商品之间有匹配关系
+        result_array = np.array([0.0] * (self.item_num + 1))
+        user_list = user_str.split(',')
+        for user in user_list:
+            user_index = self.user_dict[int(user)]
+            for i_record in xrange(self.user_array[user_index, 0], self.user_array[user_index, 1]):
+                if (i_record > self.user_array[user_index, 0]) and \
+                        (self.user_item_array[i_record, 0] == self.user_item_array[i_record - 1, 0]):
+                    continue  # 连续的购买相同商品
+                temp = self.user_item_array[i_record,]  # 商品  时间差
+
+                # 向前看n个商品
+                i_diff = 0
+                while i_diff < self.range:
+                    pre_ind = i_record - 1 - i_diff
+                    if pre_ind >= self.user_array[user_index, 0]:  # 同一用户的记录范围内
+                        temp_now = self.user_item_array[pre_ind, :]
+                        if (temp[1] - temp_now[1]) <= self.day_diff:  # 时间范围内
+                            item_index = self.item_dict.get(temp_now[0], -1)
+                            if item_index != -1:
+                                result_array[item_index] += self.order_weight[i_diff]
+                            else:
+                                continue
+                        else:
+                            break
+                        i_diff += 1
+                    else:
+                        break
+                # 向后看n个商品
+                i_diff = 0
+                while i_diff < self.range:
+                    suf_ind = i_record + 1 + i_diff
+                    if suf_ind < self.user_array[user_index, 1]:  # 此处为 小于号
+                        temp_now = self.user_item_array[suf_ind, :]
+                        if (temp_now[1] - temp[1]) <= self.day_diff:  # 时间范围内
+                            item_index = self.item_dict.get(temp_now[0], -1)
+                            if item_index != -1:
+                                result_array[item_index] += self.order_weight[i_diff]
+                            else:
+                                continue
+                        else:
+                            break
+                        i_diff += 1
+                    else:
+                        break
+        # 将 result_array 直接转化为概率
+        # 计算统计 该商品的关联性质
+        array_sum = sum(result_array)  # 求和
+        temp_result_array = np.zeros((600, 2))  # 存储 计算结果
+        i_temp_result = 0
+        # result_dict = {}
+        # my_orders1 = np.argsort(-result_array)  # 类依据 概率 降序 取序号
+        temp_array1 = np.array([0.06] * (self.item_num + 1))
+        temp_array1[0:self.top_k_da] = self.pro_da_pei  # 构造一个全长度的 搭配向量
+        temp_array2 = result_array + self.temp_item_array_hot  # 构造一个全长的 发生向量(最优概率的近似)
+        temp_array = temp_array1 * temp_array2  # 相乘
+        my_orders1 = np.argsort(-temp_array)  # 预排序
+        item_index = self.item_dict.get(item_id, -1)
+        if item_index == -1:
+            class_id = -1
+        else:
+            class_id = self.item_class[item_index]
+        pes = pro_es2.Pro_estimate()
+        for i_order in xrange(0, self.top_k_da):
+            temp_item_index = my_orders1[i_order]  # 商品的下标
+            if self.item_class[temp_item_index] == class_id:  # 类别相同
+                continue
+            if self.pro_da_pei[i_order] < 0.006:  # 小于基线
+                continue
+            temp_pro = pes.get_pro_r(self.temp_item_array_hot[temp_item_index]
+                                     , result_array[temp_item_index], array_sum)  # 发生的概率
+            temp_result_array[i_temp_result, :] = [self.item_array[temp_item_index, 0],
+                                                   temp_pro * temp_array1[temp_item_index]]
+            i_temp_result += 1
+            if i_temp_result > 600:
+                break
+        temp_result_array = temp_result_array[0:i_temp_result, :]
+        temp_order = np.argsort(-temp_result_array[:, 1])  # 按照概率降序排列
+        result_str = str(item_id) + ' ' + str(int(temp_result_array[temp_order[0], 0]))
+        for i in xrange(1, self.r_top_num):
+            result_str += ',' + str(int(temp_result_array[temp_order[i], 0]))
+        return result_str
+
+
     # 计算某一个商品的的搭配商品结果
     def calculate_item_list(self, item_user_str):
         aaa = item_user_str.split('\t')
@@ -450,6 +571,34 @@ class READ_Bought_History():
             iii += 1
         w_stream.close()
 
+    def calculate_all2(self):
+        # 索引需要计算的 item_array
+        re_item_dict = {}
+        for str_i in xrange(0, len(self.test_list)):
+            item_user_str = self.test_list[str_i]
+            string0 = item_user_str.split('\t')
+            re_item_dict[int(string0[0])] = str_i  # 指向其存储位置 方便查找
+        w_stream = open(os.path.join(self.data_dir, 'fm_submissions2.txt'), 'w')
+        r_stream = open(os.path.join(self.data_dir, 'fm_submissions2_tag_m.txt'), 'r')  # 上一次的结果
+        for line_s in r_stream:
+            my_str = line_s.split('\t')
+            item_id = int(my_str[0])
+            for x in xrange(1, self.top_k_da + 1):
+                self.pro_da_pei[x - 1] = float(my_str[x])
+            i_item_user_str = re_item_dict.get(item_id, -1)
+            if i_item_user_str == -1:
+                print "happy bugs: tag 与 购买历史 计算的商品不同"
+            item_user_str = self.test_list[i_item_user_str]
+            item_user_str = item_user_str.split('\t')
+            item_index = self.item_dict.get(item_id, 0)  # 商品存储位置编号
+            class_id = self.item_class[item_index]
+            class_index = self.class_dict[class_id]
+            self.all_2_class(class_index)  # 获取类别 后续商品热度
+            string0 = self.count_items2(item_id, item_user_str[1])  # 用户与
+            w_stream.writelines(string0 + '\n')
+        r_stream.close()
+        w_stream.close()
+
 
 if __name__ == "__main__":
     a = READ_Bought_History()
@@ -458,13 +607,14 @@ if __name__ == "__main__":
     print time.time(), 0
     a.read_history()
     print time.time(), 1
-    a.item_hot()
+    # a.item_hot()
+    a.item_hot2()  # 保证排序和wenben_rlike相同，热度降序
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    # a.class_item_hot()
+    a.class_item_hot()  # 商品顺序改变 或者 第一次计算  需要运行
+    a.read_write_class_item_hot()  # 运行class_item_hot 时，无参数 自动记录，否则 填写 ‘r’ 为参数读取之前的结果
     print time.time(), 4
-    a.read_write_class_item_hot('r')
     print time.time(), 5
     a.calculate_all()
     print time.time(), 6
