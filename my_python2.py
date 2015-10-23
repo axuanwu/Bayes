@@ -234,6 +234,58 @@ class READ_Bought_History():
                     self.like_matrix[item_index, class_index] = \
                         pes.get_pro(self.like_matrix[item_index, class_index], col_sum[class_index])
 
+    def class_item_hot2(self):
+        # 各类商品 关联商品热度 统计结果为购买某一类商品后 其他各个商品出现其后的概率
+        # 相对原版而言 修改了统计方式，并且不录入同类产品
+        self.like_matrix = np.zeros((self.top_k + 1, self.class_num + 1))  # 最后一行记录残余项
+        # 关联数
+        for i_user in xrange(0, self.user_num + 1):
+            len_0 = self.user_array[i_user, 1] - self.user_array[i_user, 0]
+            start_r = self.user_array[i_user, 0]
+            end_r = self.user_array[i_user, 1]
+            mark = np.array([0] * len_0)
+            for i_record in xrange(start_r, end_r):
+                if mark[i_record - start_r] == 1:
+                    continue  # 该类别已经被标记
+                temp = self.user_item_array[i_record,]  # 商品  时间差
+                class_index = self.class_dict.get(temp[0], -1)
+                if class_index == -1:
+                    continue
+                # 向后看n个商品
+                ju_li = 0
+                day_s = temp[1]
+                for i_record2 in xrange(i_record, end_r):
+                    ju_li += 1
+                    temp2 = self.user_item_array[i_record2,]  # 商品  时间差
+                    class_index2 = self.class_dict.get(temp2[0], -1)
+                    if class_index == -1:
+                        continue
+                    if class_index2 == class_index:  # 和正在计算的商品同类别
+                        mark[i_record2 - start_r] = 1  # 标记该类别 被统计过
+                        ju_li = 0
+                        day_s = temp2[1]
+                    else:
+                        item_index2 = self.item_dict.get(temp2[0], -1)
+                        item_index2 = min(item_index2, self.top_k)  # top+1 列存储其他所有
+                        if ju_li <= 10 and temp2[1] - day_s <= 3:
+                            self.like_matrix[item_index2, class_index] += self.order_weight[ju_li - 1]
+        # 将 like_matrix 直接转化为概率
+        col_sum = self.like_matrix.sum(0)  # 按照列 求和
+        # row_sum = self.like_matrix.sum(1)  # 按照行 求和
+        pes = pro_es2.Pro_estimate()
+        for item_index in xrange(0, self.top_k + 1):
+            # 前 top_k  个是商品 最后一项为残余项
+            if item_index % 200 == 0:
+                print time.time()
+            if item_index == self.top_k:
+                p_pre = 1 - sum(self.item_array[0:self.top_k, 1])
+            else:
+                p_pre = self.item_array[item_index, 1]
+            for class_index in xrange(0, self.class_num + 1):
+                self.like_matrix[item_index, class_index] = \
+                    pes.get_pro_r(p_pre, self.like_matrix[item_index, class_index], col_sum[class_index])
+
+
     def read_write_class_item_hot(self, my_type="w", file="class_item_hot2.txt"):
         if my_type == "w":
             w_stream = open(os.path.join(self.data_dir, file), 'w')
@@ -614,7 +666,7 @@ if __name__ == "__main__":
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    a.class_item_hot()  # 商品顺序改变 或者 第一次计算  需要运行
+    a.class_item_hot2()  # 商品顺序改变 或者 第一次计算  需要运行
     a.read_write_class_item_hot()  # 运行class_item_hot 时，无参数 自动记录，否则 填写 ‘r’ 为参数读取之前的结果
     print time.time(), 4
     print time.time(), 5
