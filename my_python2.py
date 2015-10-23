@@ -50,6 +50,8 @@ class READ_Bought_History():
         # 搭配概率
         self.top_k_da = 60000
         self.pro_da_pei = np.array([0.0] * self.top_k_da)
+        # 原始的搭配概率
+        self.p_match = 0.0006  # 任意随机商品 搭配的概率
 
     def read_history(self):
         # 将购买物品
@@ -517,7 +519,7 @@ class READ_Bought_History():
         i_temp_result = 0
         # result_dict = {}
         # my_orders1 = np.argsort(-result_array)  # 类依据 概率 降序 取序号
-        temp_array1 = np.array([0.06] * (self.item_num + 1))
+        temp_array1 = np.array([self.p_match] * (self.item_num + 1))  # 随机搭配的概率 假设
         temp_array1[0:self.top_k_da] = self.pro_da_pei  # 构造一个全长度的 搭配向量
         temp_array2 = result_array + self.temp_item_array_hot  # 构造一个全长的 发生向量(最优概率的近似)
         temp_array = temp_array1 * temp_array2  # 相乘
@@ -532,7 +534,7 @@ class READ_Bought_History():
             temp_item_index = my_orders1[i_order]  # 商品的下标
             if self.item_class[temp_item_index] == class_id:  # 类别相同
                 continue
-            if self.pro_da_pei[i_order] < 0.006:  # 小于基线
+            if self.pro_da_pei[i_order] < self.p_match:  # 小于基线
                 continue
             temp_pro = pes.get_pro_r(self.temp_item_array_hot[temp_item_index]
                                      , result_array[temp_item_index], array_sum)  # 发生的概率

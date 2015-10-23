@@ -43,7 +43,7 @@ class most_like():
         # 只考虑 最热的 6万 商品
         self.item_top_k = 60000
         # 原始的搭配概率
-        self.p_match = 0.006  # 任意随机商品 搭配的概率
+        self.p_match = 0.0006  # 任意随机商品 搭配的概率
         pass
 
     def read_txt(self, filename="dim_items.txt"):
