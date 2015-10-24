@@ -671,8 +671,8 @@ if __name__ == "__main__":
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    a.class_item_hot2()  # 商品顺序改变 或者 第一次计算  需要运行
-    a.read_write_class_item_hot('')  # 运行class_item_hot 时，无参数 自动记录，否则 填写 ‘r’ 为参数读取之前的结果
+    a.class_item_hot()  # 商品顺序改变 或者 第一次计算  需要运行
+    a.read_write_class_item_hot()  # 运行class_item_hot 时，无参数 自动记录，否则 填写 ‘r’ 为参数读取之前的结果
     print time.time(), 4
     print time.time(), 5
     a.calculate_all2()
