@@ -454,9 +454,9 @@ class most_like():
             w_stream.writelines(str(item_id) + '\t')
             for item_ind in xrange(0, self.item_top_k):
                 if item_ind != (self.item_top_k - 1):
-                    w_stream.writelines(str(round(pro_a[item_ind], 7)) + '\t')
+                    w_stream.writelines(str(round(pro_a[item_ind], 9)) + '\t')
                 else:
-                    w_stream.writelines(str(round(pro_a[item_ind], 7)) + '\n')
+                    w_stream.writelines(str(round(pro_a[item_ind], 9)) + '\n')
         w_stream.close()
 
 
@@ -470,7 +470,7 @@ if __name__ == "__main__":
     print 2
     a.my_tongji2()  # 统计 类类 关系
     a.read_item_hot()
-    # a.da_pei2()  #
+    a.da_pei2()  #
     print 3
     # a.get_item_array(171811)
 

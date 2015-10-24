@@ -26,6 +26,8 @@ class Pro_estimate():
     def get_pro_r(self, pro_pre, n, m):
         # if n>100:
         # return 1.0 * n / m  # 抽样m次命中大于一百次 无需优化
+        if 0 == m:
+            return (pro_pre )
         if (m != 0) and (abs(1.0 * n / m / pro_pre - 1) < 0.05):
             return (0.5 * n / m + 0.5 * pro_pre)
         else:
