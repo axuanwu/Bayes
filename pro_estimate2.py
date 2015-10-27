@@ -24,10 +24,10 @@ class Pro_estimate():
         self.set_array()
 
     def get_pro_r(self, pro_pre, n, m):
-        # if n>100:
-        # return 1.0 * n / m  # 抽样m次命中大于一百次 无需优化
+        if n > 100:
+            return 1.0 * n / m  # 抽样m次命中大于一百次 无需优化
         if 0 == m:
-            return (pro_pre )
+            return (pro_pre)
         if (m != 0) and (abs(1.0 * n / m / pro_pre - 1) < 0.05):
             return (0.5 * n / m + 0.5 * pro_pre)
         else:
@@ -154,4 +154,4 @@ class Pro_estimate():
 if __name__ == "__main__":
     b = Pro_estimate()
     print b.get_pro_r(0.001, 2, 100)
-    print b.get_pro_r(0.000001032, 2, 100)
+    print b.get_pro_r(0.000001032, 0, 21432)

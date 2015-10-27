@@ -106,6 +106,7 @@ class most_like():
         self.class_M[:, 1] = np.log(self.class_M[:, 1] / sum_class_num)
 
     def result_word(self, file_name='test_items2.txt'):
+        # 找出需要计算的词汇
         file_name = os.path.join(self.data_dir, file_name)
         r_stream = open(file_name, 'r')
         for line_i in r_stream:
@@ -202,7 +203,7 @@ class most_like():
 
     # 统计 类类 关系
     def my_tongji2(self):
-        # 统计结果由 sql sever 完成后存为txt 这里直接读取
+        # 统计结果由 sql sever 完成后存为txt 这里直接读取 # 检查完毕
         r_path = os.path.join(self.data_dir, "class_class.txt")
         r_stream = open(r_path, 'r')
         self.class_class = np.zeros((self.class_num, self.class_num))
@@ -214,15 +215,30 @@ class most_like():
             self.class_class[class_ind1, class_ind2] += num
         r_stream.close()
         row_sum = self.class_class.sum(1)  # 按照行求和
-        all_num = sum(self.class_M[:, 1])
+        # all_num = 6 # 商品总数
         # self.class_class[class_ind1, class_ind2] 存储 id1 类别 后面搭配 id2 类别的概率
-        for ind2 in xrange(0, self.class_num):
-            p_pre = 1.0 * self.class_M[ind2, 1] / all_num  # ind2 发生的概率
-            for ind1 in xrange(0, self.class_num):
+        w_path1 = open(os.path.join(self.data_dir, "class_class1.txt"), 'w')
+        w_path2 = open(os.path.join(self.data_dir, "class_class2.txt"), 'w')
+        w_path3 = open(os.path.join(self.data_dir, "class_class3.txt"), 'w')
+        for ind1 in xrange(0, self.class_num):
+            p_pre = np.exp(self.class_M[ind1, 1])  # 原假设： ind2 发生的概率
+            w_path3.writelines(str(p_pre) + '\t')
+            for ind2 in xrange(0, self.class_num):
+                p_pre = np.exp(self.class_M[ind2, 1])  # 原假设： ind2 发生的概率
+                if ind2 == self.class_num - 1:
+                    w_path1.writelines(str(self.class_class[ind1, ind2]) + '\n')
+                else:
+                    w_path1.writelines(str(self.class_class[ind1, ind2]) + '\t')
                 self.class_class[ind1, ind2] = self.pro_guji.get_pro_r(p_pre,
                                                                        self.class_class[ind1, ind2],
-                                                                       row_sum[ind1])
-        pass
+                                                                       row_sum[ind1])  # ind1 条件下 ind2 的概率
+                if ind2 == self.class_num - 1:
+                    w_path2.writelines(str(self.class_class[ind1, ind2]) + '\n')
+                else:
+                    w_path2.writelines(str(self.class_class[ind1, ind2]) + '\t')
+        w_path1.close()
+        w_path2.close()
+        w_path3.close()
 
     # 统计词词关系 new 基于sql sever 处理过的文件开始统计 简化代码
     def my_tongji3(self):
@@ -287,7 +303,7 @@ class most_like():
         for line in o_stream:
             my_str = line.strip().split(',')
             for x in xrange(0, self.top_k_word + 1):
-                self.word_word[i_line, x] = math.exp(float(my_str[x]))
+                self.word_word[i_line, x] = math.exp(float(my_str[x]))  # 真概率
             i_line += 1
         o_stream.close()
         if i_line == (self.r_word_num + 1):
@@ -407,7 +423,7 @@ class most_like():
             # item_id == self.class_M[item_ind,0]
             temp_result_array = np.zeros((self.item_num, 2))  # 第一列记录词组的意见，第二列记录类别的意见 概率乘 化作 加
             class_pro = np.log(self.class_class[class_ind, :])  # 搭配时 该商品类别到各个类别的概率
-            class_pro2 = self.class_M[:, 1]  # 不搭配时 该商品类别到各个类别的概率
+            class_pro2 = self.class_M[:, 1]  # 不搭配时 该商品类别到各个类别的概率对数
             temp_word_pro = np.array([0.0] * (self.top_k_word + 1))  # 该商品词组发生后各个词组的概率
             word_num = 0
             word_str_array = word_str.split(',')
@@ -465,12 +481,13 @@ if __name__ == "__main__":
     a.read_txt()
     a.result_word()
     print 1
-    # a.my_tongji3()  # 统计 词词 关系
-    a.read_word_word()
-    print 2
     a.my_tongji2()  # 统计 类类 关系
-    a.read_item_hot()
-    a.da_pei2()  #
-    print 3
-    # a.get_item_array(171811)
+    # # a.my_tongji3()  # 统计 词词 关系
+    # a.read_word_word()
+    # print 2
+    # a.my_tongji2()  # 统计 类类 关系
+    # a.read_item_hot()
+    # a.da_pei2()  #
+    # print 3
+    # # a.get_item_array(171811)
 

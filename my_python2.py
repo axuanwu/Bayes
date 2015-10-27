@@ -51,7 +51,8 @@ class READ_Bought_History():
         self.top_k_da = 60000
         self.pro_da_pei = np.array([0.0] * self.top_k_da)
         # 原始的搭配概率
-        self.p_match = 0.0006  # 任意随机商品 搭配的概率
+        self.p_match = 0.0006
+        self.class_class = 0
 
     def read_history(self):
         # 将购买物品
@@ -595,7 +596,7 @@ class READ_Bought_History():
             temp_result_array[i_temp_result, :] = [self.item_array[temp_item_index, 0],
                                                    temp_pro * temp_array1[temp_item_index]]
             i_temp_result += 1
-            if i_temp_result == 600:
+            if i_temp_result == 400:
                 break
         temp_result_array = temp_result_array[0:i_temp_result, :]
         temp_order = np.argsort(-temp_result_array[:, 1])  # 按照概率降序排列
@@ -639,7 +640,10 @@ class READ_Bought_History():
         iii = 0
         for line_s in r_stream:
             if iii % 100 == 0:
-                print 100
+                print iii, time.time()
+            iii += 1
+            if iii < 1684:
+                continue
             my_str = line_s.split('\t')
             item_id = int(my_str[0])
             for x in xrange(1, self.top_k_da + 1):
@@ -671,8 +675,8 @@ if __name__ == "__main__":
     print time.time(), 2
     a.read_class_id()
     print time.time(), 3
-    a.class_item_hot()  # 商品顺序改变 或者 第一次计算  需要运行
-    a.read_write_class_item_hot()  # 运行class_item_hot 时，无参数 自动记录，否则 填写 ‘r’ 为参数读取之前的结果
+    # a.class_item_hot()  # 商品顺序改变 或者 第一次计算  需要运行
+    a.read_write_class_item_hot('r')  # 运行class_item_hot 时，无参数 自动记录，否则 填写 ‘r’ 为参数读取之前的结果
     print time.time(), 4
     print time.time(), 5
     a.calculate_all2()
