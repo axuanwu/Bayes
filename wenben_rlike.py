@@ -244,7 +244,7 @@ class most_like():
     def my_tongji3(self):
         split_ss = self.r_word_num
         temp_array = np.zeros((self.r_word_num + 1, self.top_k_word + 1))
-        p_remain = sum(self.word_M[self.top_k_word:, 1])  # 残余项原始概率
+        p_remain = sum(np.exp(self.word_M[self.top_k_word:, 1]))  # 残余项原始概率
         i_file = 0
         file_name = "word_word_pro"
         r_path = os.path.join(self.data_dir, "wordstr_wordstr.txt")
@@ -277,7 +277,7 @@ class most_like():
             if i_col == self.top_k_word:
                 p_pre = p_remain
             else:
-                p_pre = self.word_M[i_col, 1]
+                p_pre = np.exp(self.word_M[i_col, 1])
             for i_row in xrange(0, row_num):
                 temp_array[i_row, i_col] = \
                     self.pro_guji.get_pro_r(p_pre,

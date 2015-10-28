@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 __author__ = '01053185'
-# 该部分的主要指是直接使用达人的匹配数据进行关联结果
+# 该部分的主要是直接使用达人的匹配数据进行关联结果
 class exp_of_people():
     def __init__(self):
         self.matrix_item = np.zeros((90000, 3), int)
